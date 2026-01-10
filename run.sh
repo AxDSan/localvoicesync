@@ -66,5 +66,27 @@ if command -v ydotoold &> /dev/null; then
     echo "Using YDOTOOL_SOCKET=$YDOTOOL_SOCKET"
 fi
 
+# Check for --fast or -f flag to skip building
+FAST_MODE=false
+for arg in "$@"; do
+    if [ "$arg" == "--fast" ] || [ "$arg" == "-f" ]; then
+        FAST_MODE=true
+        break
+    fi
+done
+
+if [ "$FAST_MODE" = true ]; then
+    BINARY="./build/linux/x64/debug/bundle/localvoicesync"
+    if [ -f "$BINARY" ]; then
+        echo "Running pre-built binary: $BINARY"
+        exec "$BINARY"
+    else
+        echo "Error: Debug binary not found at $BINARY"
+        echo "Please run once without --fast to build the application."
+        exit 1
+    fi
+fi
+
 # Run the Flutter application on Linux
+echo "Starting Flutter run..."
 exec flutter run -d linux "$@"
