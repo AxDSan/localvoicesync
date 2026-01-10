@@ -21,7 +21,7 @@
 
 ---
 
-![Screenshot](flutter_01.png)
+![LocalVoiceSync](/images/screenshot.png)
 
 ## 🚀 Overview
 
