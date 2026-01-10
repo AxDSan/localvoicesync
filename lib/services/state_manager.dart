@@ -30,6 +30,17 @@ final voiceSyncManagerProvider = Provider<VoiceSyncManager>((ref) {
     ref.read(interimResultsProvider.notifier).state = text;
   };
   
+  // Link injection error
+  manager.onInjectionError = (error) {
+    ref.read(injectionErrorProvider.notifier).state = error;
+    if (error != null) {
+      // Clear error after 5 seconds
+      Future.delayed(const Duration(seconds: 5), () {
+        ref.read(injectionErrorProvider.notifier).state = null;
+      });
+    }
+  };
+  
   // Link mode switch callback for auto-PTT
   manager.onModeSwitch = (mode) {
     ref.read(settingsServiceProvider).recordingMode = mode;
@@ -59,7 +70,12 @@ final recordingStateProvider = StreamProvider<RecordingState>((ref) {
 
 final interimResultsProvider = StateProvider<String>((ref) => '');
 
+final injectionErrorProvider = StateProvider<String?>((ref) => null);
+
 final statusMessageProvider = Provider<String>((ref) {
+  final error = ref.watch(injectionErrorProvider);
+  if (error != null) return error;
+
   final interim = ref.watch(interimResultsProvider);
   if (interim.isNotEmpty) return interim;
 

@@ -3,58 +3,126 @@ import 'package:flutter/services.dart';
 
 class TextInjectionService {
   bool _isWayland = Platform.environment['XDG_SESSION_TYPE'] == 'wayland';
+  bool lastInjectionWasFallback = false;
 
-  Future<void> injectText(String text, {String method = 'dotool'}) async {
+  Future<bool> injectText(String text, {String method = 'dotool'}) async {
+    lastInjectionWasFallback = false;
+    print('DEBUG: [Injection] Injecting text using method: $method (Wayland: $_isWayland)');
+    
     if (method == 'Clipboard') {
-      await _injectClipboard(text);
-      return;
+      return await _injectClipboard(text);
     }
 
     if (_isWayland) {
-      await _injectWayland(text);
+      return await _injectWayland(text);
     } else {
-      await _injectX11(text);
+      return await _injectX11(text);
     }
   }
 
-  Future<void> _injectClipboard(String text) async {
-    await Clipboard.setData(ClipboardData(text: text));
-    // Optional: simulate Ctrl+V if we want it to actually paste
+  Future<bool> _injectClipboard(String text) async {
+    print('DEBUG: [Injection] Setting clipboard data');
+    try {
+      await Clipboard.setData(ClipboardData(text: text));
+      print('DEBUG: [Injection] Clipboard data set successfully');
+    } catch (e) {
+      print('DEBUG: [Injection] Failed to set clipboard data: $e');
+      return false;
+    }
+    
+    // Optional: simulate Ctrl+V
+    print('DEBUG: [Injection] Attempting to simulate Ctrl+V...');
+    bool pasteSuccess = false;
     if (_isWayland) {
-      try {
-        await Process.run('ydotool', ['key', '29:1', '47:1', '47:0', '29:0']); // Ctrl+V
-      } catch (_) {}
+      pasteSuccess = await _tryRun('dotool', [], stdinText: 'key ctrl+v\n');
+      if (!pasteSuccess) {
+        pasteSuccess = await _tryRun('ydotool', ['key', '29:1', '47:1', '47:0', '29:0']);
+      }
+      if (!pasteSuccess) {
+        pasteSuccess = await _tryRun('wtype', ['-M', 'ctrl', 'v']);
+      }
     } else {
-      try {
-        await Process.run('xdotool', ['key', 'ctrl+v']);
-      } catch (_) {}
+      pasteSuccess = await _tryRun('xdotool', ['key', 'ctrl+v']);
+    }
+
+    if (pasteSuccess) {
+      print('DEBUG: [Injection] Ctrl+V simulation succeeded');
+    } else {
+      print('DEBUG: [Injection] Ctrl+V simulation failed');
+    }
+    
+    return true; // Consider success if clipboard was set
+  }
+
+  Future<bool> _tryRun(String command, List<String> args, {String? stdinText}) async {
+    try {
+      // For ydotool, ensure we point to the correct socket if it exists
+      Map<String, String> env = Map.from(Platform.environment);
+      if (command.contains('ydotool')) {
+        if (!env.containsKey('YDOTOOL_SOCKET')) {
+          if (await File('/run/user/0/.ydotool_socket').exists()) {
+            env['YDOTOOL_SOCKET'] = '/run/user/0/.ydotool_socket';
+          } else {
+            final uid = Platform.environment['USER_ID'] ?? '1000';
+            env['YDOTOOL_SOCKET'] = '/run/user/$uid/.ydotool_socket';
+          }
+        }
+      }
+
+      if (stdinText != null) {
+        print('DEBUG: [Injection] Running: echo "$stdinText" | $command ${args.join(' ')} (Socket: ${env['YDOTOOL_SOCKET']})');
+        final process = await Process.start(command, args, environment: env);
+        process.stdin.write(stdinText);
+        await process.stdin.close();
+        
+        final exitCode = await process.exitCode;
+        if (exitCode == 0) return true;
+        return false;
+      } else {
+        print('DEBUG: [Injection] Running: $command ${args.join(' ')} (Socket: ${env['YDOTOOL_SOCKET']})');
+        final result = await Process.run(command, args, environment: env);
+        return result.exitCode == 0;
+      }
+    } catch (e) {
+      return false;
     }
   }
 
-  Future<void> _injectX11(String text) async {
-    try {
-      await Process.run('xdotool', ['type', '--clearmodifiers', text]);
-    } catch (e) {
-      print('X11 Injection Error: $e');
+  Future<bool> _injectX11(String text) async {
+    bool success = await _tryRun('xdotool', ['type', '--clearmodifiers', text]);
+    if (!success) {
+      print('DEBUG: [Injection] X11 injection failed. Is xdotool installed?');
+      // Fallback to clipboard
+      return await _injectClipboard(text);
     }
+    return true;
   }
 
-  Future<void> _injectWayland(String text) async {
-    try {
-      // Use ydotool with a small delay between characters if needed
-      // but 'type' should work. 
-      // Ensure YDOTOOL_SOCKET is handled if user has it in a non-standard place.
-      final result = await Process.run('ydotool', ['type', text]);
-      if (result.exitCode != 0) {
-        // Fallback to wtype
-        await Process.run('wtype', [text]);
-      }
-    } catch (e) {
-      try {
-        await Process.run('wtype', [text]);
-      } catch (e2) {
-        print('Wayland Injection Error: $e2');
-      }
+  Future<bool> _injectWayland(String text) async {
+    print('DEBUG: [Injection] Attempting Wayland injection...');
+    
+    // Try dotool first (standard for this app)
+    bool success = await _tryRun('dotool', [], stdinText: 'type $text\n');
+    
+    // Try ydotool
+    if (!success) {
+      success = await _tryRun('ydotool', ['type', text]);
+    }
+    
+    // Try wtype
+    if (!success) {
+      success = await _tryRun('wtype', [text]);
+    }
+    
+    if (success) {
+      print('DEBUG: [Injection] Wayland injection succeeded');
+      return true;
+    } else {
+      print('DEBUG: [Injection] All Wayland injection tools failed. Is dotool, ydotool, or wtype installed?');
+      // Final fallback: copy to clipboard
+      print('DEBUG: [Injection] Falling back to Clipboard...');
+      lastInjectionWasFallback = true;
+      return await _injectClipboard(text);
     }
   }
 }

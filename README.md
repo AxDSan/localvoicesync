@@ -88,7 +88,15 @@ sudo dnf install clang cmake ninja-build pkg-config gtk3-devel
 
 # Hardware Acceleration
 sudo dnf install vulkan-loader-devel mesa-vulkan-devel
+
+# Text Injection Tools (Required for Speech-to-Text)
+# For Wayland (Default on Fedora):
+sudo dnf install wtype ydotool xinput
+# For X11:
+sudo dnf install xdotool
 ```
+
+**Note on `ydotool`:** This tool requires a background daemon. You can start it automatically by running the included `./run.sh` script, or manually via `sudo ydotoold`.
 
 ### 🔨 Build Process
 ```bash

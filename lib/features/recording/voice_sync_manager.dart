@@ -27,6 +27,7 @@ class VoiceSyncManager {
   final _uuid = const Uuid();
 
   void Function(String)? onInterimResult;
+  void Function(String?)? onInjectionError;
   Timer? _interimTimer;
   bool _isProcessingInterim = false;
 
@@ -363,9 +364,18 @@ class VoiceSyncManager {
         }
 
         // 3. Inject text
-        print('DEBUG: Injecting text with method: ${_settings.injectionMethod}');
-        await _injector.injectText(finalOutput, method: _settings.injectionMethod);
-        print('DEBUG: Text injection completed');
+        print('DEBUG: [Process] Injecting text with method: ${_settings.injectionMethod}');
+        final success = await _injector.injectText(finalOutput, method: _settings.injectionMethod);
+        
+        if (!success) {
+          print('DEBUG: [Process] Injection FAILED completely');
+          onInjectionError?.call('Injection failed. Please check dependencies.');
+        } else if (_injector.lastInjectionWasFallback && _settings.injectionMethod != 'Clipboard') {
+          print('DEBUG: [Process] Injection succeeded via FALLBACK (Clipboard)');
+          onInjectionError?.call('Direct injection failed. Copied to clipboard.');
+        } else {
+          print('DEBUG: [Process] Injection completed successfully');
+        }
 
         // 4. Save to history
         final entry = HistoryEntry(
