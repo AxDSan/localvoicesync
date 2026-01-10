@@ -41,12 +41,9 @@ void main(List<String> args) async {
               brightness: Brightness.dark,
             ),
           ),
-          home: Scaffold(
-            backgroundColor: Colors.transparent,
-            body: InterimOverlayUI(
-              windowId: windowIdString,
-              args: argument,
-            ),
+          home: InterimOverlayUI(
+            windowId: windowIdString,
+            args: argument,
           ),
         ),
       ),

@@ -17,9 +17,12 @@ final historyManagerProvider =
   return HistoryManager();
 });
 
+/// The VoiceSyncManager is a singleton that should persist across settings changes.
+/// We use ref.read instead of ref.watch to avoid recreating the manager when settings change.
 final voiceSyncManagerProvider = Provider<VoiceSyncManager>((ref) {
-  final settings = ref.watch(settingsServiceProvider);
-  final history = ref.watch(historyManagerProvider.notifier);
+  // Use ref.read to get settings without watching (prevents recreation on settings change)
+  final settings = ref.read(settingsServiceProvider);
+  final history = ref.read(historyManagerProvider.notifier);
   final manager = VoiceSyncManager(settings, history);
   
   // Link interim results
@@ -27,7 +30,26 @@ final voiceSyncManagerProvider = Provider<VoiceSyncManager>((ref) {
     ref.read(interimResultsProvider.notifier).state = text;
   };
   
+  // Link mode switch callback for auto-PTT
+  manager.onModeSwitch = (mode) {
+    ref.read(settingsServiceProvider).recordingMode = mode;
+    // Stop listening when switching to PTT mode
+    if (mode == 'PTT') {
+      manager.stopListening();
+    }
+  };
+  
+  // Link state change callback for immediate UI updates
+  manager.onStateChange = (state) {
+    ref.read(recordingStateNotifierProvider.notifier).state = state;
+  };
+  
   return manager;
+});
+
+/// Direct state notifier for immediate UI updates (bypasses stream latency)
+final recordingStateNotifierProvider = StateProvider<RecordingState>((ref) {
+  return RecordingState.idle;
 });
 
 final recordingStateProvider = StreamProvider<RecordingState>((ref) {
@@ -41,7 +63,7 @@ final statusMessageProvider = Provider<String>((ref) {
   final interim = ref.watch(interimResultsProvider);
   if (interim.isNotEmpty) return interim;
 
-  final state = ref.watch(recordingStateProvider).value ?? RecordingState.idle;
+  final state = ref.watch(recordingStateNotifierProvider);
   switch (state) {
     case RecordingState.idle:
       return 'Ready to capture';
@@ -73,9 +95,18 @@ class OverlayController {
   static const Duration _initialReadyDelay = Duration(milliseconds: 500);
 
   OverlayController(this._ref) {
-    _ref.listen(recordingStateProvider, (previous, next) {
-      final state = next.value ?? RecordingState.idle;
-      _updateVisibility(state);
+    // Pre-initialize the overlay window so it's ready when needed
+    _initializeOverlay();
+    
+    // Listen to the direct state notifier for immediate updates
+    _ref.listen(recordingStateNotifierProvider, (previous, next) {
+      print('DEBUG: OverlayController received state change: $next');
+      _updateVisibility(next);
+      
+      // Clear interim results when returning to idle
+      if (next == RecordingState.idle) {
+        _ref.read(interimResultsProvider.notifier).state = '';
+      }
     });
 
     _ref.listen(interimResultsProvider, (previous, next) {
@@ -108,10 +139,8 @@ class OverlayController {
     print('DEBUG: OverlayController._updateVisibility(state: $state)');
     
     if (state != RecordingState.idle) {
-      // Need to show the overlay
-      if (_window == null && !_isInitializing) {
-        await _initializeOverlay();
-      }
+      // Need to show the overlay - wait for initialization if in progress
+      await _ensureOverlayReady();
       
       if (_window != null && _isWindowReady) {
         print('DEBUG: Showing overlay window ${_window?.windowId}');
@@ -148,6 +177,27 @@ class OverlayController {
           }
         }
       }
+    }
+  }
+  
+  /// Wait for the overlay to be ready, initializing if needed.
+  Future<void> _ensureOverlayReady() async {
+    // If already ready, nothing to do
+    if (_window != null && _isWindowReady) return;
+    
+    // If initialization is in progress, wait for it
+    if (_isInitializing) {
+      print('DEBUG: OverlayController: Waiting for initialization to complete...');
+      // Poll until initialization completes
+      for (int i = 0; i < 20; i++) { // Max 2 seconds
+        await Future.delayed(const Duration(milliseconds: 100));
+        if (!_isInitializing) break;
+      }
+    }
+    
+    // If still not ready, try to initialize
+    if (_window == null && !_isInitializing) {
+      await _initializeOverlay();
     }
   }
 

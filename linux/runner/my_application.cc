@@ -50,6 +50,34 @@ static void find_and_set_view_transparent(GtkWidget* widget) {
   }
 }
 
+typedef struct {
+  GtkWindow* window;
+  int x;
+  int y;
+  int width;
+  int height;
+} WindowPosData;
+
+static gboolean deferred_positioning(gpointer user_data) {
+  WindowPosData* data = (WindowPosData*)user_data;
+  if (GTK_IS_WINDOW(data->window)) {
+    GdkWindow* gdk_window = gtk_widget_get_window(GTK_WIDGET(data->window));
+    if (gdk_window != nullptr) {
+      g_printerr("DEBUG: [deferred_positioning] Brute-force moving GdkWindow to (%d, %d)\n", data->x, data->y);
+      
+      // On X11 with override-redirect, we must move the GDK window directly
+      // because the Window Manager is not managing this window.
+      gdk_window_move(gdk_window, data->x, data->y);
+      gdk_window_raise(gdk_window);
+      
+      // Ensure it stays override-redirect
+      gdk_window_set_override_redirect(gdk_window, TRUE);
+    }
+  }
+  g_free(data);
+  return FALSE;
+}
+
 // Called after the window is mapped (visible on screen)
 static gboolean on_overlay_map_event(GtkWidget* widget, GdkEvent* event, gpointer data) {
   g_printerr("DEBUG: [on_overlay_map_event] Ghost window enforcement for %p\n", widget);
@@ -92,15 +120,27 @@ static gboolean on_overlay_map_event(GtkWidget* widget, GdkEvent* event, gpointe
     GdkRectangle geometry;
     gdk_monitor_get_geometry(monitor, &geometry);
     
-    int window_width = 460;
-    int window_height = 80;
+    g_printerr("DEBUG: [on_overlay_map_event] Monitor geometry: x=%d, y=%d, w=%d, h=%d\n", 
+               geometry.x, geometry.y, geometry.width, geometry.height);
+
+    int window_width = 1200;
+    int window_height = 200; // Increased height
     int x = geometry.x + (geometry.width - window_width) / 2;
-    int y = geometry.y + geometry.height - window_height - 120;
+    int y = geometry.y + geometry.height - window_height - 40;
     
     gtk_window_move(GTK_WINDOW(widget), x, y);
     gtk_window_resize(GTK_WINDOW(widget), window_width, window_height);
     
-    g_printerr("DEBUG: [on_overlay_map_event] Positioned at (%d, %d)\n", x, y);
+    // Defer a second move to fight against WM centering
+    WindowPosData* pos_data = g_new(WindowPosData, 1);
+    pos_data->window = GTK_WINDOW(widget);
+    pos_data->x = x;
+    pos_data->y = y;
+    pos_data->width = window_width;
+    pos_data->height = window_height;
+    g_timeout_add(100, deferred_positioning, pos_data);
+    
+    g_printerr("DEBUG: [on_overlay_map_event] Calculated position: (%d, %d)\n", x, y);
   }
   
   return FALSE;
@@ -112,11 +152,14 @@ static void on_overlay_realize(GtkWidget* widget, gpointer data) {
   
   GdkWindow* gdk_window = gtk_widget_get_window(widget);
   if (gdk_window != nullptr) {
-    // Set type hint at GDK level
-    gdk_window_set_type_hint(gdk_window, GDK_WINDOW_TYPE_HINT_DOCK);
+    // Set type hint at GDK level too
+    gdk_window_set_type_hint(gdk_window, GDK_WINDOW_TYPE_HINT_TOOLTIP);
     gdk_window_set_decorations(gdk_window, (GdkWMDecoration)0);
     gdk_window_set_functions(gdk_window, (GdkWMFunction)0);
     gdk_window_set_keep_above(gdk_window, TRUE);
+    
+    // Crucial: set override-redirect as early as possible
+    gdk_window_set_override_redirect(gdk_window, TRUE);
   }
 }
 
@@ -135,8 +178,9 @@ static void configure_overlay_window(GtkWindow* window) {
   }
   
   // === STEP 2: Window Type Hint ===
-  // DOCK type is usually frameless on KDE
-  gtk_window_set_type_hint(window, GDK_WINDOW_TYPE_HINT_DOCK);
+  // TOOLTIP hint is the most reliable for manual positioning on KDE/X11
+  // because the WM usually ignores it for placement rules.
+  gtk_window_set_type_hint(window, GDK_WINDOW_TYPE_HINT_TOOLTIP);
   
   // === STEP 3: Disable decorations ===
   gtk_window_set_decorated(window, FALSE);
@@ -153,8 +197,8 @@ static void configure_overlay_window(GtkWindow* window) {
   gtk_window_set_skip_pager_hint(window, TRUE);
   
   // === STEP 6: Fixed size ===
-  gtk_widget_set_size_request(GTK_WIDGET(window), 460, 80);
-  gtk_window_set_default_size(window, 460, 80);
+  gtk_widget_set_size_request(GTK_WIDGET(window), 1200, 200);
+  gtk_window_set_default_size(window, 1200, 200);
   
   // === STEP 7: RGBA visual for transparency ===
   GdkScreen* screen = gtk_window_get_screen(window);

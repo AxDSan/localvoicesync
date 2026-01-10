@@ -62,59 +62,72 @@ class _InterimOverlayUIState extends State<InterimOverlayUI> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      alignment: Alignment.center,
-      color: Colors.transparent,
-      child: CustomPaint(
-        painter: InterimResultsPainter(
-          accentColor: AppTheme.skyBlue,
-        ),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          constraints: const BoxConstraints(minWidth: 200, maxWidth: 440),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Pulsing Dot
-              AnimatedBuilder(
-                animation: _pulseController,
-                builder: (context, child) {
-                  return Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: AppTheme.skyBlue.withOpacity(0.3 + (_pulseController.value * 0.7)),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.skyBlue.withOpacity(0.5 * _pulseController.value),
-                          blurRadius: 10,
-                          spreadRadius: 2,
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Stack(
+        children: [
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 40, // Anchor strictly to bottom of the window
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                constraints: const BoxConstraints(minWidth: 200, maxWidth: 1000),
+                child: CustomPaint(
+                  painter: InterimResultsPainter(
+                    accentColor: AppTheme.skyBlue,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Pulsing Dot
+                        AnimatedBuilder(
+                          animation: _pulseController,
+                          builder: (context, child) {
+                            return Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: AppTheme.skyBlue.withOpacity(0.3 + (_pulseController.value * 0.7)),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppTheme.skyBlue.withOpacity(0.5 * _pulseController.value),
+                                    blurRadius: 10,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(width: 16),
+                        Flexible(
+                          child: Text(
+                            _interimText,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.2,
+                              decoration: TextDecoration.none,
+                              fontFamily: 'Inter',
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
-                  );
-                },
-              ),
-              const SizedBox(width: 16),
-              Flexible(
-                child: Text(
-                  _interimText,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.2,
-                    decoration: TextDecoration.none,
-                    fontFamily: 'Inter',
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -168,5 +181,5 @@ class InterimResultsPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

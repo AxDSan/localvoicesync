@@ -16,6 +16,7 @@ struct vad_context {
     
     vad_config config;
     std::vector<float> state;
+    std::vector<float> context;  // Context buffer (64 samples for 16kHz, 32 for 8kHz)
     
     vad_context() : env(nullptr), session(nullptr), mem_info(nullptr) {}
 };
@@ -50,7 +51,13 @@ vad_context* vad_init(const char* model_path, vad_config config) {
     }
     
     g_ort->CreateMemoryInfo("Cpu", OrtDeviceAllocator, 0, OrtMemTypeDefault, &ctx->mem_info);
+    
+    // Initialize state (2 x 1 x 128 for Silero VAD)
     ctx->state.assign(2 * 1 * 128, 0.0f);
+    
+    // Initialize context buffer (64 samples for 16kHz, 32 for 8kHz)
+    int context_size = (config.sample_rate == 16000) ? 64 : 32;
+    ctx->context.assign(context_size, 0.0f);
     
     return ctx;
 }
@@ -66,23 +73,45 @@ void vad_free(vad_context* ctx) {
 void vad_reset(vad_context* ctx) {
     if (!ctx) return;
     std::fill(ctx->state.begin(), ctx->state.end(), 0.0f);
+    std::fill(ctx->context.begin(), ctx->context.end(), 0.0f);
 }
+
+static int debug_counter = 0;
 
 float vad_process(vad_context* ctx, const float* samples, int n_samples) {
     if (!ctx || !ctx->session) return 0.0f;
     
-    // Debug: check first few samples
-    // std::cout << "First sample: " << samples[0] << std::endl;
+    int context_size = (int)ctx->context.size();
+    
+    // Build input: [context (64 samples) + new samples (512 samples)] = 576 samples total
+    std::vector<float> input_with_context(context_size + n_samples);
+    std::copy(ctx->context.begin(), ctx->context.end(), input_with_context.begin());
+    std::copy(samples, samples + n_samples, input_with_context.begin() + context_size);
+    
+    int total_samples = (int)input_with_context.size();
+    
+    // Debug: check sample statistics every 50 calls
+    debug_counter++;
+    if (debug_counter % 50 == 0) {
+        float maxAbs = 0.0f;
+        float sum = 0.0f;
+        for (int i = 0; i < total_samples; i++) {
+            float abs = input_with_context[i] < 0 ? -input_with_context[i] : input_with_context[i];
+            if (abs > maxAbs) maxAbs = abs;
+            sum += input_with_context[i];
+        }
+        std::cout << "DEBUG: [VAD Native] n=" << total_samples << " (ctx=" << context_size << " + samples=" << n_samples << ") maxAbs=" << maxAbs << " mean=" << (sum/total_samples) << " sr=" << ctx->config.sample_rate << std::endl;
+    }
 
     const char* input_names[] = {"input", "state", "sr"};
     const char* output_names[] = {"output", "stateN"};
     
-    int64_t input_shape[] = {1, (int64_t)n_samples};
+    int64_t input_shape[] = {1, (int64_t)total_samples};
     int64_t state_shape[] = {2, 1, 128};
     int64_t sr_val = (int64_t) ctx->config.sample_rate;
     
     OrtValue* input_tensor = nullptr;
-    g_ort->CreateTensorWithDataAsOrtValue(ctx->mem_info, (void*)samples, n_samples * sizeof(float), input_shape, 2, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &input_tensor);
+    g_ort->CreateTensorWithDataAsOrtValue(ctx->mem_info, (void*)input_with_context.data(), total_samples * sizeof(float), input_shape, 2, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &input_tensor);
     
     OrtValue* state_tensor = nullptr;
     g_ort->CreateTensorWithDataAsOrtValue(ctx->mem_info, (void*)ctx->state.data(), ctx->state.size() * sizeof(float), state_shape, 3, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &state_tensor);
@@ -99,8 +128,24 @@ float vad_process(vad_context* ctx, const float* samples, int n_samples) {
     if (status == nullptr) {
         float* output_data;
         g_ort->GetTensorMutableData(outputs[0], (void**)&output_data);
+        
+        // Debug: print output tensor info
+        if (debug_counter % 50 == 0) {
+            OrtTensorTypeAndShapeInfo* type_info;
+            g_ort->GetTensorTypeAndShape(outputs[0], &type_info);
+            size_t num_dims;
+            g_ort->GetDimensionsCount(type_info, &num_dims);
+            std::vector<int64_t> dims(num_dims);
+            g_ort->GetDimensions(type_info, dims.data(), num_dims);
+            std::cout << "DEBUG: [VAD Native] output dims=" << num_dims << " [";
+            for (size_t i = 0; i < num_dims; i++) std::cout << dims[i] << (i < num_dims-1 ? ", " : "");
+            std::cout << "] values=[" << output_data[0] << "]" << std::endl;
+            g_ort->ReleaseTensorTypeAndShapeInfo(type_info);
+        }
+        
         prob = output_data[0];
         
+        // Update hidden state
         float* next_state_data;
         g_ort->GetTensorMutableData(outputs[1], (void**)&next_state_data);
         if (next_state_data) {
@@ -114,6 +159,10 @@ float vad_process(vad_context* ctx, const float* samples, int n_samples) {
         std::cerr << "VAD ORT Run failed: " << msg << std::endl;
         g_ort->ReleaseStatus(status);
     }
+    
+    // Update context with the last 64 samples of the full input (context + new audio)
+    // This matches the Python implementation: self._context = x[..., -context_size:]
+    std::copy(input_with_context.end() - context_size, input_with_context.end(), ctx->context.begin());
     
     g_ort->ReleaseValue(input_tensor);
     g_ort->ReleaseValue(state_tensor);

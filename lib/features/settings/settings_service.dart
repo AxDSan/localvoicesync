@@ -140,7 +140,7 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
   }
 
-  String get ollamaModel => _prefs.getString(_keyOllamaModel) ?? 'llama3';
+  String get ollamaModel => _prefs.getString(_keyOllamaModel) ?? 'llama3.2:1b';
   set ollamaModel(String value) {
     _prefs.setString(_keyOllamaModel, value);
     notifyListeners();

@@ -7,10 +7,11 @@ class OllamaClient {
   final String? model;
 
   OllamaClient({
-    this.baseUrl = 'http://localhost:11434',
+    String baseUrl = 'http://localhost:11434',
     this.model,
-  }) : _dio = Dio(BaseOptions(
-          baseUrl: baseUrl,
+  })  : baseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl,
+        _dio = Dio(BaseOptions(
+          baseUrl: baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl,
           connectTimeout: const Duration(seconds: 30),
           receiveTimeout: const Duration(seconds: 60),
         ));
@@ -32,6 +33,7 @@ class OllamaClient {
     int? numPredict,
     double temperature = 0.7,
   }) async {
+    print('DEBUG: OllamaClient.generateText hit: ${baseUrl}/api/generate with model: $model');
     try {
       final data = {
         'model': model,
@@ -45,6 +47,13 @@ class OllamaClient {
       final response = await _dio.post('/api/generate', data: data);
       return response.data['response'] as String;
     } catch (e) {
+      if (e is DioException && e.response?.statusCode == 404) {
+        // Log available models to help the user debug
+        try {
+          final models = await getModels();
+          print('DEBUG: Ollama 404 - Model "$model" not found. Available models: $models');
+        } catch (_) {}
+      }
       throw OllamaException('Failed to generate text: $e');
     }
   }

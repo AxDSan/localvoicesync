@@ -66,10 +66,52 @@ class VadEngine {
     this.threshold = threshold;
   }
 
+  int _debugCounter = 0;
+  double _maxProbSeen = 0.0;
+  
   bool isSpeech(List<double> samples) {
-    final prob = process(samples);
-    return prob >= threshold;
+    _vadBuffer.addAll(samples);
+    
+    // Silero VAD works best with frames of 512, 1024, or 1536 samples at 16kHz
+    // We'll use 512 as our target frame size
+    const int targetFrameSize = 512;
+    
+    bool speechDetected = false;
+    double maxProb = 0.0;
+    
+    // Debug: check sample amplitude
+    double maxAmp = 0.0;
+    for (final s in samples) {
+      if (s.abs() > maxAmp) maxAmp = s.abs();
+    }
+    
+    while (_vadBuffer.length >= targetFrameSize) {
+      final frame = _vadBuffer.sublist(0, targetFrameSize);
+      _vadBuffer.removeRange(0, targetFrameSize);
+      
+      final prob = process(frame);
+      if (prob > maxProb) maxProb = prob;
+      if (prob >= threshold) {
+        speechDetected = true;
+      }
+    }
+    
+    // Track max probability seen for debugging
+    if (maxProb > _maxProbSeen) {
+      _maxProbSeen = maxProb;
+    }
+    
+    // Debug log every ~2 seconds, OR when amplitude is high (likely speech)
+    _debugCounter++;
+    final bool isLoudAudio = maxAmp > 0.15;
+    if (_debugCounter % 20 == 0 || isLoudAudio) {
+      print('DEBUG: [VAD] maxProb=$maxProb, maxAmp=${maxAmp.toStringAsFixed(3)}, threshold=$threshold, detected=$speechDetected, allTimeMax=$_maxProbSeen${isLoudAudio ? " [LOUD]" : ""}');
+    }
+    
+    return speechDetected;
   }
+
+  final List<double> _vadBuffer = [];
 
   double process(List<double> samples) {
     if (_context == nullptr) throw Exception('VAD engine disposed');

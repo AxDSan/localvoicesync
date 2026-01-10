@@ -16,8 +16,14 @@ class AudioCaptureService {
   bool _isRecording = false;
   bool get isRecording => _isRecording;
 
+  int _sampleCounter = 0;
+  
   Future<void> start() async {
-    if (_isRecording) return;
+    print('DEBUG: [AudioCapture] start() called, _isRecording=$_isRecording');
+    if (_isRecording) {
+      print('DEBUG: [AudioCapture] Already recording, returning early');
+      return;
+    }
 
     if (await _record.hasPermission()) {
       final config = RecordConfig(
@@ -26,8 +32,11 @@ class AudioCaptureService {
         numChannels: 1,
       );
 
+      print('DEBUG: [AudioCapture] Starting stream...');
       final stream = await _record.startStream(config);
+      print('DEBUG: [AudioCapture] Stream started, setting up subscription...');
       
+      _sampleCounter = 0;
       _subscription = stream.listen((Uint8List data) {
         // Convert PCM16 (Int16) to Float32 [-1.0, 1.0]
         final floatSamples = <double>[];
@@ -44,21 +53,33 @@ class AudioCaptureService {
         }
         _samplesController.add(floatSamples);
         _volumeController.add(maxAbs);
+        
+        // Debug: log every 10th sample batch
+        _sampleCounter++;
+        if (_sampleCounter % 10 == 0) {
+          print('DEBUG: [AudioCapture] Emitted ${floatSamples.length} samples (batch #$_sampleCounter)');
+        }
       });
 
       _isRecording = true;
+      print('DEBUG: [AudioCapture] Recording started successfully');
     } else {
       throw Exception('Microphone permission denied');
     }
   }
 
   Future<void> stop() async {
-    if (!_isRecording) return;
+    print('DEBUG: [AudioCapture] stop() called, _isRecording=$_isRecording');
+    if (!_isRecording) {
+      print('DEBUG: [AudioCapture] Not recording, returning early');
+      return;
+    }
 
     await _subscription?.cancel();
     _subscription = null;
     await _record.stop();
     _isRecording = false;
+    print('DEBUG: [AudioCapture] Recording stopped');
   }
 
   void dispose() {

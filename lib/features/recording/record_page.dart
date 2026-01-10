@@ -68,7 +68,8 @@ class _RecordPageState extends ConsumerState<RecordPage>
 
   @override
   Widget build(BuildContext context) {
-    final recordingState = ref.watch(recordingStateProvider).value ?? RecordingState.idle;
+    // Use the direct state notifier for immediate UI updates
+    final recordingState = ref.watch(recordingStateNotifierProvider);
     final isRecording = recordingState == RecordingState.recording;
 
     if (isRecording) {

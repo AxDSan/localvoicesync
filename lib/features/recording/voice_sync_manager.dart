@@ -27,6 +27,8 @@ class VoiceSyncManager {
   final _uuid = const Uuid();
 
   void Function(String)? onInterimResult;
+  Timer? _interimTimer;
+  bool _isProcessingInterim = false;
 
   WhisperEngine? _whisper;
   VadEngine? _vad;
@@ -36,7 +38,16 @@ class VoiceSyncManager {
   RecordingState get state => _state;
 
   final _stateController = StreamController<RecordingState>.broadcast();
+  
+  /// Stream that forwards all state changes from the broadcast controller.
+  /// Use `state` getter for current state.
   Stream<RecordingState> get stateStream => _stateController.stream;
+  
+  /// Callback to notify when mode should be switched (e.g., PTT hotkey pressed)
+  void Function(String mode)? onModeSwitch;
+  
+  /// Callback to directly notify state changes (bypasses stream for immediate updates)
+  void Function(RecordingState state)? onStateChange;
 
   final List<double> _audioBuffer = [];
   bool _isSpeechDetected = false;
@@ -107,8 +118,18 @@ class VoiceSyncManager {
     _hotkey.setPttKey(_settings.pttKey);
     _hotkey.startPolling();
 
-    _hotkey.pttStateStream.listen((isPressed) {
+    _hotkey.pttStateStream.listen((isPressed) async {
+      // Auto-switch to PTT mode when hotkey is pressed (regardless of current mode)
+      if (isPressed && _settings.recordingMode != 'PTT') {
+        print('DEBUG: PTT hotkey pressed, auto-switching to PTT mode');
+        onModeSwitch?.call('PTT');
+        // Wait a frame for Riverpod to rebuild before starting recording
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
+      
+      // Only handle recording if in PTT mode
       if (_settings.recordingMode != 'PTT') return;
+      
       if (isPressed) {
         startRecording();
       } else {
@@ -119,7 +140,15 @@ class VoiceSyncManager {
     _audio.samplesStream.listen(_handleAudioSamples);
   }
 
+  int _sampleDebugCounter = 0;
+  
   void _handleAudioSamples(List<double> samples) {
+    // Debug: log every 10th chunk
+    _sampleDebugCounter++;
+    if (_sampleDebugCounter % 10 == 0) {
+      print('DEBUG: [Audio] mode=${_settings.recordingMode}, state=$_state, samples=${samples.length}, buffer=${_audioBuffer.length}');
+    }
+    
     if (_settings.recordingMode == 'Live') {
       _processLiveVAD(samples);
       return;
@@ -133,25 +162,48 @@ class VoiceSyncManager {
   DateTime? _lastSpeechTime;
   bool _isCurrentlySpeaking = false;
 
+  int _vadDebugCounter = 0;
+  
   void _processLiveVAD(List<double> samples) {
-    _audioBuffer.addAll(samples);
+    // In Live mode, we always want to see the volume spikes, which is handled
+    // by AudioCaptureService.volumeStream.
+    
+    // We only add to _audioBuffer if we are recording or if we want some pre-roll
+    if (_state == RecordingState.recording) {
+      _audioBuffer.addAll(samples);
+    } else if (_state == RecordingState.idle) {
+      // Keep a small pre-roll buffer (e.g., 500ms)
+      _audioBuffer.addAll(samples);
+      const int maxPreRoll = 8000; // 0.5s at 16kHz
+      if (_audioBuffer.length > maxPreRoll) {
+        _audioBuffer.removeRange(0, _audioBuffer.length - maxPreRoll);
+      }
+    }
     
     // In Live mode, we use VAD to trigger recording
     if (_vad != null) {
       final isSpeech = _vad!.isSpeech(samples);
       
+      // Debug log every ~1 second (assuming 100ms chunks = 10 per second)
+      _vadDebugCounter++;
+      if (_vadDebugCounter % 10 == 0) {
+        print('DEBUG: [Live VAD] isSpeech=$isSpeech, speaking=$_isCurrentlySpeaking, state=$_state');
+      }
+      
       if (isSpeech) {
         _lastSpeechTime = DateTime.now();
         if (!_isCurrentlySpeaking) {
+          print('DEBUG: [Live] Speech detected! Starting recording...');
           _isCurrentlySpeaking = true;
           if (_state == RecordingState.idle) {
-            startRecording();
+            startRecording(isAutomatic: true);
           }
         }
       } else {
         if (_isCurrentlySpeaking && _lastSpeechTime != null) {
-          // Wait for 500ms of silence before stopping
-          if (DateTime.now().difference(_lastSpeechTime!).inMilliseconds > 500) {
+          // Wait for 1000ms of silence before stopping (more robust than 500ms)
+          if (DateTime.now().difference(_lastSpeechTime!).inMilliseconds > 1000) {
+            print('DEBUG: [Live] Silence detected, stopping');
             _isCurrentlySpeaking = false;
             if (_state == RecordingState.recording) {
               stopRecording();
@@ -159,6 +211,42 @@ class VoiceSyncManager {
           }
         }
       }
+    }
+  }
+
+  Future<void> _processInterim() async {
+    // Allow processing even if we just moved to processing state to get that last bit of text
+    if ((_state != RecordingState.recording && _state != RecordingState.processing) || 
+        _audioBuffer.isEmpty || _isProcessingInterim) {
+      print('DEBUG: [Interim] Skipping - state=$_state, bufferEmpty=${_audioBuffer.isEmpty}, processing=$_isProcessingInterim');
+      return;
+    }
+
+    _isProcessingInterim = true;
+    try {
+      final samples = List<double>.from(_audioBuffer);
+      print('DEBUG: [Interim] Processing ${samples.length} samples...');
+      
+      if (samples.length > 4000) { // Reduced to 0.25s for faster interim results
+        final text = await _whisper!.transcribe(
+          audioSamples: samples,
+          language: _settings.language,
+        );
+        
+        // Check state again as it might have changed during transcription
+        if ((_state == RecordingState.recording || _state == RecordingState.processing) && text.isNotEmpty) {
+          print('DEBUG: [Interim] Sending result: "${text.substring(0, text.length > 30 ? 30 : text.length)}..."');
+          onInterimResult?.call(text);
+        } else {
+          print('DEBUG: [Interim] Result not sent - state=$_state, textEmpty=${text.isEmpty}');
+        }
+      } else {
+        print('DEBUG: [Interim] Not enough samples (${samples.length} < 4000)');
+      }
+    } catch (e) {
+      print('DEBUG: Interim transcription failed: $e');
+    } finally {
+      _isProcessingInterim = false;
     }
   }
 
@@ -186,25 +274,43 @@ class VoiceSyncManager {
     }
   }
 
-  Future<void> startRecording() async {
-    print('DEBUG: VoiceSyncManager.startRecording() called, current state: $_state');
+  Future<void> startRecording({bool isAutomatic = false}) async {
+    print('DEBUG: VoiceSyncManager.startRecording(isAutomatic: $isAutomatic) called, current state: $_state');
     if (_state != RecordingState.idle) {
       print('DEBUG: startRecording ignored because state is not idle');
       return;
     }
     
     try {
-      print('DEBUG: Clearing audio buffer and starting audio capture...');
-      _audioBuffer.clear();
+      if (!isAutomatic && _settings.recordingMode != 'Live') {
+        print('DEBUG: Clearing audio buffer...');
+        _audioBuffer.clear();
+      } else {
+        print('DEBUG: Keeping existing buffer (${_audioBuffer.length} samples) for automatic/live recording');
+      }
+
       onInterimResult?.call('');
       _recordingStartTime = DateTime.now();
-      await _audio.start();
-      print('DEBUG: Audio capture started successfully');
+
+      // Update state BEFORE awaiting audio start to catch early samples
       _state = RecordingState.recording;
       _stateController.add(_state);
+      onStateChange?.call(_state);  // Immediate callback for UI
+
+      await _audio.start();
+      print('DEBUG: Audio capture started successfully');
+
+      // Start interim results timer
+      _interimTimer?.cancel();
+      _interimTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+        _processInterim();
+      });
     } catch (e, stack) {
       print('DEBUG: Failed to start recording: $e');
       print('DEBUG: Stack trace: $stack');
+      _state = RecordingState.idle;
+      _stateController.add(_state);
+      onStateChange?.call(_state);  // Immediate callback for UI
     }
   }
 
@@ -215,10 +321,14 @@ class VoiceSyncManager {
       return;
     }
 
+    _interimTimer?.cancel();
+    _interimTimer = null;
+
     print('DEBUG: Stopping recording and starting processing...');
     final endTime = DateTime.now();
     _state = RecordingState.processing;
     _stateController.add(_state);
+    onStateChange?.call(_state);  // Immediate callback for UI
     
     try {
       await _audio.stop();
@@ -228,6 +338,7 @@ class VoiceSyncManager {
         print('DEBUG: Audio buffer is empty, nothing to transcribe');
         _state = RecordingState.idle;
         _stateController.add(_state);
+        onStateChange?.call(_state);  // Immediate callback for UI
         return;
       }
 
@@ -238,8 +349,9 @@ class VoiceSyncManager {
         language: _settings.language,
       );
       print('DEBUG: Whisper transcription result: "$text"');
-
+      
       if (text.trim().isNotEmpty) {
+        onInterimResult?.call(text);
         // 2. Cleanup with Ollama (Optional)
         String finalOutput = text;
         try {
@@ -274,7 +386,9 @@ class VoiceSyncManager {
     }
 
     _state = RecordingState.idle;
+    _isCurrentlySpeaking = false; // Reset speech detection state
     _stateController.add(_state);
+    onStateChange?.call(_state);  // Immediate callback for UI
     print('DEBUG: Returning to idle state');
   }
 
