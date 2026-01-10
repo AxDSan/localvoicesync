@@ -1,0 +1,16 @@
+name: VadBindings
+description: FFI bindings for Silero VAD using ONNX Runtime
+output: lib/native/vad_bindings.dart
+headers:
+  entry-points:
+    - '/home/aj/Documents/DevStuff/localvoicesync-flutter/native/vad/vad_wrapper.h'
+compiler-opts:
+  - '-I/usr/include'
+  - '-I/usr/lib/gcc/x86_64-redhat-linux/15/include'
+functions:
+  include:
+    - 'vad_.*'
+structs:
+  include:
+    - 'vad_context'
+    - 'vad_config'

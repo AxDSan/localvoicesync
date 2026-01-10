@@ -1,0 +1,12 @@
+name: HotkeyBindings
+description: FFI bindings for X11 hotkey polling
+output: lib/native/hotkey/hotkey_bindings.dart
+headers:
+  entry-points:
+    - '/home/aj/Documents/DevStuff/localvoicesync-flutter/native/hotkey/hotkey_wrapper.h'
+compiler-opts:
+  - '-I/usr/include'
+  - '-I/usr/lib/gcc/x86_64-redhat-linux/15/include'
+functions:
+  include:
+    - 'x11_.*'

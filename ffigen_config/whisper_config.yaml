@@ -1,0 +1,52 @@
+name: WhisperBindings
+description: FFI bindings for Whisper.cpp
+output: lib/native/whisper/whisper_bindings.dart
+headers:
+  entry-points:
+    - '/home/aj/Documents/DevStuff/localvoicesync-flutter/native/whisper/whisper_wrapper.h'
+compiler-opts:
+  - '-I/home/aj/Documents/DevStuff/voiceonlinux/localvoicesync-qt/build/_deps/whisper-src/include'
+  - '-I/home/aj/Documents/DevStuff/localvoicesync-flutter/native/whisper'
+  - '-I/usr/include'
+  - '-I/usr/lib/gcc/x86_64-redhat-linux/15/include'
+functions:
+  include:
+    - 'whisper_.*'
+  rename:
+    'whisper_version': 'version'
+    'whisper_init_from_file_with_params': 'initFromFileWithParams'
+    'whisper_init_from_file': 'initFromFile'
+    'whisper_free': 'free'
+    'whisper_full_default_params': 'fullDefaultParams'
+    'whisper_context_default_params': 'contextDefaultParams'
+    'whisper_full': 'full'
+    'whisper_full_n_segments': 'fullNSegments'
+    'whisper_full_get_segment_text': 'fullGetSegmentText'
+    'whisper_full_get_segment_t0': 'fullGetSegmentT0'
+    'whisper_full_get_segment_t1': 'fullGetSegmentT1'
+    'whisper_full_n_tokens': 'fullNTokens'
+    'whisper_full_get_token_text': 'fullGetTokenText'
+    'whisper_full_lang_id': 'fullLangId'
+    'whisper_n_vocab': 'nVocab'
+    'whisper_n_text_ctx': 'nTextCtx'
+    'whisper_n_audio_ctx': 'nAudioCtx'
+    'whisper_is_multilingual': 'isMultilingual'
+enums:
+  include:
+    - 'whisper_.*'
+  rename:
+    'WHISPER_SAMPLING_GREEDY': 'samplingGreedy'
+    'WHISPER_SAMPLING_BEAM_SEARCH': 'samplingBeamSearch'
+structs:
+  include:
+    - 'whisper_.*'
+  rename:
+    'whisper_context': 'Context'
+    'whisper_full_params': 'FullParams'
+    'whisper_context_params': 'ContextParams'
+globals:
+  include:
+    - 'WHISPER_.*'
+typedefs:
+  include:
+    - 'whisper_.*'
