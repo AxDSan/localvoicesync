@@ -60,11 +60,19 @@ class TextInjectionService {
       Map<String, String> env = Map.from(Platform.environment);
       if (command.contains('ydotool')) {
         if (!env.containsKey('YDOTOOL_SOCKET')) {
-          if (await File('/run/user/0/.ydotool_socket').exists()) {
-            env['YDOTOOL_SOCKET'] = '/run/user/0/.ydotool_socket';
-          } else {
-            final uid = Platform.environment['USER_ID'] ?? '1000';
-            env['YDOTOOL_SOCKET'] = '/run/user/$uid/.ydotool_socket';
+          // Check standard locations in order of preference
+          final userUid = Platform.environment['USER_ID'] ?? '1000';
+          final possibleSockets = [
+            '/run/user/$userUid/.ydotool_socket',
+            '/run/user/0/.ydotool_socket',
+            '/tmp/.ydotool_socket',
+          ];
+
+          for (final path in possibleSockets) {
+            if (await File(path).exists()) {
+              env['YDOTOOL_SOCKET'] = path;
+              break;
+            }
           }
         }
       }

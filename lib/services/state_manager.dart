@@ -181,16 +181,12 @@ class OverlayController {
       // Hide the overlay
       if (_window != null && _isWindowReady) {
         print('DEBUG: Hiding overlay window');
-        for (int attempt = 0; attempt < _maxRetries; attempt++) {
-          try {
-            await _window!.hide();
-            break;
-          } catch (e) {
-            print('DEBUG: Hide attempt ${attempt + 1} failed: $e');
-            if (attempt < _maxRetries - 1) {
-              await Future.delayed(_retryDelay);
-            }
-          }
+        // Small delay to ensure any pending frames are drawn before hiding/losing context
+        await Future.delayed(const Duration(milliseconds: 50));
+        try {
+          await _window!.hide();
+        } catch (e) {
+          print('DEBUG: Hide failed: $e');
         }
       }
     }
