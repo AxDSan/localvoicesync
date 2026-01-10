@@ -1,5 +1,5 @@
-name: localvoicesync_flutter
-description: "LocalVoiceSync - Offline speech-to-text using Whisper AI with LLM-powered text cleanup"
+name: localvoicesync
+description: "Privacy-First, Local Speech-to-Text with Intelligent Cleanup for Linux"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
