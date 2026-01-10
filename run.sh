@@ -23,32 +23,44 @@ if command -v ydotoold &> /dev/null; then
     USER_SOCKET="/run/user/$(id -u)/.ydotool_socket"
     export YDOTOOL_SOCKET="$USER_SOCKET"
 
-    # Check if the socket actually exists and is usable, not just if a process is "running"
-    if [ ! -S "$USER_SOCKET" ]; then
-        echo "ydotoold socket not found. Starting daemon..."
+    # Function to test if ydotool actually works
+    test_ydotool() {
+        # Try a no-op command to see if the daemon responds
+        timeout 2 ydotool type "" 2>/dev/null
+        return $?
+    }
+
+    # Always try to ensure the daemon is running and responsive
+    if ! test_ydotool; then
+        echo "ydotoold is not responding. Starting fresh daemon..."
         
-        # Kill any stale ydotoold processes first
+        # Remove stale socket file if it exists
+        sudo rm -f "$USER_SOCKET" 2>/dev/null || true
+        
+        # Kill any stale ydotoold processes
         sudo pkill -9 ydotoold 2>/dev/null || true
         sleep 0.5
         
         # Start ydotoold with user ownership so the app can access the socket
+        echo "Starting ydotoold daemon..."
         sudo ydotoold --socket-path="$USER_SOCKET" --socket-own="$(id -u):$(id -g)" --socket-perm=0660 &
         
-        # Wait for the socket to appear
+        # Wait for the daemon to be responsive
         for i in {1..10}; do
-            if [ -S "$USER_SOCKET" ]; then
+            if test_ydotool; then
                 echo "ydotoold started successfully!"
                 break
             fi
-            echo "Waiting for ydotoold socket... ($i/10)"
+            echo "Waiting for ydotoold to respond... ($i/10)"
             sleep 0.5
         done
         
-        if [ ! -S "$USER_SOCKET" ]; then
-            echo "WARNING: ydotoold socket still not available. Injection may not work."
+        if ! test_ydotool; then
+            echo "WARNING: ydotoold is still not responding. Injection may not work."
+            echo "Try running 'sudo ydotoold' manually in a separate terminal."
         fi
     else
-        echo "ydotoold socket already exists at $USER_SOCKET"
+        echo "ydotoold is already running and responsive"
     fi
     
     echo "Using YDOTOOL_SOCKET=$YDOTOOL_SOCKET"

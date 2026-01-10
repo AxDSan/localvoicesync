@@ -109,17 +109,21 @@ class TextInjectionService {
   Future<bool> _injectWayland(String text) async {
     print('DEBUG: [Injection] Attempting Wayland injection...');
     
-    // Try dotool first (standard for this app)
-    bool success = await _tryRun('dotool', [], stdinText: 'type $text\n');
+    // Escape or sanitize text for shell safety - replace newlines with spaces
+    final sanitizedText = text.replaceAll('\n', ' ').replaceAll('\r', ' ').trim();
+    print('DEBUG: [Injection] Sanitized text: "$sanitizedText"');
     
-    // Try ydotool
+    // Try ydotool first - it's the most reliable on KDE (wtype doesn't work on KDE)
+    bool success = await _tryRun('ydotool', ['type', '--', sanitizedText]);
+    
+    // Try wtype as fallback (works on GNOME/Sway but NOT on KDE)
     if (!success) {
-      success = await _tryRun('ydotool', ['type', text]);
+      success = await _tryRun('wtype', ['--', sanitizedText]);
     }
     
-    // Try wtype
+    // Try dotool as last resort
     if (!success) {
-      success = await _tryRun('wtype', [text]);
+      success = await _tryRun('dotool', [], stdinText: 'type $sanitizedText\n');
     }
     
     if (success) {
