@@ -332,8 +332,12 @@ class VoiceSyncManager {
     onStateChange?.call(_state);  // Immediate callback for UI
     
     try {
-      await _audio.stop();
-      print('DEBUG: Audio capture stopped. Buffer size: ${_audioBuffer.length} samples');
+      if (_settings.recordingMode != 'Live') {
+        await _audio.stop();
+        print('DEBUG: Audio capture stopped. Buffer size: ${_audioBuffer.length} samples');
+      } else {
+        print('DEBUG: [Live] Keeping audio capture active for next detection');
+      }
 
       if (_audioBuffer.isEmpty) {
         print('DEBUG: Audio buffer is empty, nothing to transcribe');
@@ -395,6 +399,7 @@ class VoiceSyncManager {
       print('DEBUG: Stack trace: $stack');
     }
 
+    _audioBuffer.clear();
     _state = RecordingState.idle;
     _isCurrentlySpeaking = false; // Reset speech detection state
     _stateController.add(_state);
