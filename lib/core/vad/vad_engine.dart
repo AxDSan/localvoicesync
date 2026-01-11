@@ -103,10 +103,10 @@ class VadEngine {
     
     // Debug log every ~2 seconds, OR when amplitude is high (likely speech)
     _debugCounter++;
-    final bool isLoudAudio = maxAmp > 0.15;
-    if (_debugCounter % 20 == 0 || isLoudAudio) {
-      print('DEBUG: [VAD] maxProb=$maxProb, maxAmp=${maxAmp.toStringAsFixed(3)}, threshold=$threshold, detected=$speechDetected, allTimeMax=$_maxProbSeen${isLoudAudio ? " [LOUD]" : ""}');
-    }
+    // final bool isLoudAudio = maxAmp > 0.15;
+    // if (_debugCounter % 20 == 0 || isLoudAudio) {
+    //   print('DEBUG: [VAD] maxProb=$maxProb, maxAmp=${maxAmp.toStringAsFixed(3)}, threshold=$threshold, detected=$speechDetected, allTimeMax=$_maxProbSeen${isLoudAudio ? " [LOUD]" : ""}');
+    // }
     
     return speechDetected;
   }

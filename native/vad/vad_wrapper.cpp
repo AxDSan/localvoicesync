@@ -92,6 +92,7 @@ float vad_process(vad_context* ctx, const float* samples, int n_samples) {
     
     // Debug: check sample statistics every 50 calls
     debug_counter++;
+    /*
     if (debug_counter % 50 == 0) {
         float maxAbs = 0.0f;
         float sum = 0.0f;
@@ -102,6 +103,7 @@ float vad_process(vad_context* ctx, const float* samples, int n_samples) {
         }
         std::cout << "DEBUG: [VAD Native] n=" << total_samples << " (ctx=" << context_size << " + samples=" << n_samples << ") maxAbs=" << maxAbs << " mean=" << (sum/total_samples) << " sr=" << ctx->config.sample_rate << std::endl;
     }
+    */
 
     const char* input_names[] = {"input", "state", "sr"};
     const char* output_names[] = {"output", "stateN"};
@@ -130,6 +132,7 @@ float vad_process(vad_context* ctx, const float* samples, int n_samples) {
         g_ort->GetTensorMutableData(outputs[0], (void**)&output_data);
         
         // Debug: print output tensor info
+        /*
         if (debug_counter % 50 == 0) {
             OrtTensorTypeAndShapeInfo* type_info;
             g_ort->GetTensorTypeAndShape(outputs[0], &type_info);
@@ -142,6 +145,7 @@ float vad_process(vad_context* ctx, const float* samples, int n_samples) {
             std::cout << "] values=[" << output_data[0] << "]" << std::endl;
             g_ort->ReleaseTensorTypeAndShapeInfo(type_info);
         }
+        */
         
         prob = output_data[0];
         

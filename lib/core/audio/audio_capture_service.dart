@@ -56,9 +56,9 @@ class AudioCaptureService {
         
         // Debug: log every 10th sample batch
         _sampleCounter++;
-        if (_sampleCounter % 10 == 0) {
-          print('DEBUG: [AudioCapture] Emitted ${floatSamples.length} samples (batch #$_sampleCounter)');
-        }
+        // if (_sampleCounter % 10 == 0) {
+        //   print('DEBUG: [AudioCapture] Emitted ${floatSamples.length} samples (batch #$_sampleCounter)');
+        // }
       });
 
       _isRecording = true;

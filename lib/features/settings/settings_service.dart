@@ -14,6 +14,7 @@ class SettingsService extends ChangeNotifier {
   static const String _keyInjectionMethod = 'injection_method';
   static const String _keyAutoCleanup = 'auto_cleanup';
   static const String _keyLanguage = 'language';
+  static const String _keyOutputLanguage = 'output_language';
   static const String _keyRecordingMode = 'recording_mode';
 
   late SharedPreferences _prefs;
@@ -164,9 +165,35 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
   }
 
+  String get outputLanguage => _prefs.getString(_keyOutputLanguage) ?? 'en';
+  set outputLanguage(String value) {
+    _prefs.setString(_keyOutputLanguage, value);
+    notifyListeners();
+  }
+
   String get recordingMode => _prefs.getString(_keyRecordingMode) ?? 'Manual';
   set recordingMode(String value) {
     _prefs.setString(_keyRecordingMode, value);
     notifyListeners();
   }
+
+  static const Map<String, Map<String, String>> availableLanguages = {
+    'en': {'name': 'English', 'flag': '🇺🇸'},
+    'es': {'name': 'Spanish', 'flag': '🇪🇸'},
+    'fr': {'name': 'French', 'flag': '🇫🇷'},
+    'de': {'name': 'German', 'flag': '🇩🇪'},
+    'it': {'name': 'Italian', 'flag': '🇮🇹'},
+    'pt': {'name': 'Portuguese', 'flag': '🇵🇹'},
+    'nl': {'name': 'Dutch', 'flag': '🇳🇱'},
+    'ru': {'name': 'Russian', 'flag': '🇷🇺'},
+    'zh': {'name': 'Chinese', 'flag': '🇨🇳'},
+    'ja': {'name': 'Japanese', 'flag': '🇯🇵'},
+    'ko': {'name': 'Korean', 'flag': '🇰🇷'},
+    'hi': {'name': 'Hindi', 'flag': '🇮🇳'},
+    'ar': {'name': 'Arabic', 'flag': '🇸🇦'},
+    'tr': {'name': 'Turkish', 'flag': '🇹🇷'},
+    'pl': {'name': 'Polish', 'flag': '🇵🇱'},
+    'uk': {'name': 'Ukrainian', 'flag': '🇺🇦'},
+    'auto': {'name': 'Auto Detect', 'flag': '🌍'},
+  };
 }

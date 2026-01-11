@@ -146,9 +146,9 @@ class VoiceSyncManager {
   void _handleAudioSamples(List<double> samples) {
     // Debug: log every 10th chunk
     _sampleDebugCounter++;
-    if (_sampleDebugCounter % 10 == 0) {
-      print('DEBUG: [Audio] mode=${_settings.recordingMode}, state=$_state, samples=${samples.length}, buffer=${_audioBuffer.length}');
-    }
+    // if (_sampleDebugCounter % 10 == 0) {
+    //   print('DEBUG: [Audio] mode=${_settings.recordingMode}, state=$_state, samples=${samples.length}, buffer=${_audioBuffer.length}');
+    // }
     
     if (_settings.recordingMode == 'Live') {
       _processLiveVAD(samples);
@@ -187,9 +187,9 @@ class VoiceSyncManager {
       
       // Debug log every ~1 second (assuming 100ms chunks = 10 per second)
       _vadDebugCounter++;
-      if (_vadDebugCounter % 10 == 0) {
-        print('DEBUG: [Live VAD] isSpeech=$isSpeech, speaking=$_isCurrentlySpeaking, state=$_state');
-      }
+      // if (_vadDebugCounter % 10 == 0) {
+      //   print('DEBUG: [Live VAD] isSpeech=$isSpeech, speaking=$_isCurrentlySpeaking, state=$_state');
+      // }
       
       if (isSpeech) {
         _lastSpeechTime = DateTime.now();
@@ -219,14 +219,14 @@ class VoiceSyncManager {
     // Allow processing even if we just moved to processing state to get that last bit of text
     if ((_state != RecordingState.recording && _state != RecordingState.processing) || 
         _audioBuffer.isEmpty || _isProcessingInterim) {
-      print('DEBUG: [Interim] Skipping - state=$_state, bufferEmpty=${_audioBuffer.isEmpty}, processing=$_isProcessingInterim');
+      // print('DEBUG: [Interim] Skipping - state=$_state, bufferEmpty=${_audioBuffer.isEmpty}, processing=$_isProcessingInterim');
       return;
     }
 
     _isProcessingInterim = true;
     try {
       final samples = List<double>.from(_audioBuffer);
-      print('DEBUG: [Interim] Processing ${samples.length} samples...');
+      // print('DEBUG: [Interim] Processing ${samples.length} samples...');
       
       if (samples.length > 4000) { // Reduced to 0.25s for faster interim results
         final text = await _whisper!.transcribe(
@@ -239,10 +239,10 @@ class VoiceSyncManager {
           print('DEBUG: [Interim] Sending result: "${text.substring(0, text.length > 30 ? 30 : text.length)}..."');
           onInterimResult?.call(text);
         } else {
-          print('DEBUG: [Interim] Result not sent - state=$_state, textEmpty=${text.isEmpty}');
+          // print('DEBUG: [Interim] Result not sent - state=$_state, textEmpty=${text.isEmpty}');
         }
       } else {
-        print('DEBUG: [Interim] Not enough samples (${samples.length} < 4000)');
+        // print('DEBUG: [Interim] Not enough samples (${samples.length} < 4000)');
       }
     } catch (e) {
       print('DEBUG: Interim transcription failed: $e');
@@ -357,14 +357,17 @@ class VoiceSyncManager {
       
       if (text.trim().isNotEmpty) {
         onInterimResult?.call(text);
-        // 2. Cleanup with Ollama (Optional)
+        // 2. Cleanup and Translate with Ollama (Optional)
         String finalOutput = text;
         try {
-          print('DEBUG: Starting Ollama cleanup...');
-          finalOutput = await _ollama.processTranscription(text);
-          print('DEBUG: Ollama cleanup result: "$finalOutput"');
+          print('DEBUG: Starting Ollama processing (target: ${_settings.outputLanguage})...');
+          finalOutput = await _ollama.processTranscription(
+            text, 
+            targetLanguage: _settings.outputLanguage != _settings.language ? _settings.outputLanguage : null,
+          );
+          print('DEBUG: Ollama result: "$finalOutput"');
         } catch (e) {
-          print('DEBUG: Ollama cleanup failed: $e');
+          print('DEBUG: Ollama processing failed: $e');
         }
 
         // 3. Inject text

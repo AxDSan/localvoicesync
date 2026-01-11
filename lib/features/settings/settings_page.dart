@@ -43,13 +43,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 title: Text(
                   fileName,
                   style: TextStyle(
-                    color: isSelected ? AppTheme.orangeMain : Colors.white,
+                    color: isSelected ? AppTheme.orangeMain : AppTheme.textDark,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
                 subtitle: Text(
                   modelPath,
-                  style: const TextStyle(fontSize: 10, color: Colors.white54),
+                  style: const TextStyle(fontSize: 10, color: AppTheme.textGray),
                 ),
                 onTap: () {
                   settings.whisperModelPath = modelPath;
@@ -99,7 +99,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   title: Text(
                     modelName,
                     style: TextStyle(
-                      color: isSelected ? AppTheme.orangeMain : Colors.white,
+                      color: isSelected ? AppTheme.orangeMain : AppTheme.textDark,
                       fontWeight:
                           isSelected ? FontWeight.bold : FontWeight.normal,
                     ),
@@ -157,20 +157,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     hintText: 'e.g. llama3, mistral, llama2:7b',
                     errorText: error,
                   ),
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: AppTheme.textDark),
                 )
               else ...[
                 Text('Pulling ${controller.text}...',
-                    style: const TextStyle(color: Colors.white)),
+                    style: const TextStyle(color: AppTheme.textDark)),
                 const SizedBox(height: 16),
                 LinearProgressIndicator(
                   value: pullProgress == -1 ? null : pullProgress / 100,
                   color: AppTheme.orangeMain,
-                  backgroundColor: Colors.white10,
+                  backgroundColor: AppTheme.textGray.withOpacity(0.1),
                 ),
                 const SizedBox(height: 8),
                 Text(pullProgress == -1 ? 'Initializing...' : '$pullProgress%',
-                    style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                    style: const TextStyle(color: AppTheme.textGray, fontSize: 12)),
               ],
             ],
           ),
@@ -233,7 +233,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             children: [
               const Text(
                 'Assign a hotkey to trigger recording.',
-                style: TextStyle(fontSize: 12, color: Colors.white70),
+                style: TextStyle(fontSize: 12, color: AppTheme.textGray),
               ),
               const SizedBox(height: 24),
               AppClickable(
@@ -255,10 +255,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   decoration: BoxDecoration(
                     color: isListening
                         ? AppTheme.orangeMain.withOpacity(0.1)
-                        : Colors.white.withOpacity(0.05),
+                        : AppTheme.textDark.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isListening ? AppTheme.orangeMain : Colors.white12,
+                      color: isListening ? AppTheme.orangeMain : AppTheme.textDark.withOpacity(0.1),
                       width: 2,
                     ),
                   ),
@@ -267,7 +267,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       Icon(
                         isListening ? Icons.keyboard_rounded : Icons.touch_app_rounded,
                         size: 48,
-                        color: isListening ? AppTheme.orangeMain : Colors.white24,
+                        color: isListening ? AppTheme.orangeMain : AppTheme.textDark.withOpacity(0.2),
                       ),
                       const SizedBox(height: 12),
                       Text(
@@ -275,7 +275,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          color: isListening ? AppTheme.orangeMain : Colors.white,
+                          color: isListening ? AppTheme.orangeMain : AppTheme.textDark,
                         ),
                       ),
                     ],
@@ -286,7 +286,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               if (!isListening)
                 const Text(
                   'Click the box and press a key',
-                  style: TextStyle(fontSize: 10, color: Colors.white38),
+                  style: TextStyle(fontSize: 10, color: AppTheme.textGray),
                 ),
             ],
           ),
@@ -311,26 +311,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
   Future<void> _showLanguageDialog() async {
     final settings = ref.read(settingsServiceProvider);
-    final languages = {
-      'en': {'name': 'English', 'flag': '🇺🇸'},
-      'es': {'name': 'Spanish', 'flag': '🇪🇸'},
-      'fr': {'name': 'French', 'flag': '🇫🇷'},
-      'de': {'name': 'German', 'flag': '🇩🇪'},
-      'it': {'name': 'Italian', 'flag': '🇮🇹'},
-      'pt': {'name': 'Portuguese', 'flag': '🇵🇹'},
-      'nl': {'name': 'Dutch', 'flag': '🇳🇱'},
-      'ru': {'name': 'Russian', 'flag': '🇷🇺'},
-      'zh': {'name': 'Chinese', 'flag': '🇨🇳'},
-      'ja': {'name': 'Japanese', 'flag': '🇯🇵'},
-      'ko': {'name': 'Korean', 'flag': '🇰🇷'},
-      'auto': {'name': 'Auto Detect', 'flag': '🌍'},
-    };
+    final languages = SettingsService.availableLanguages;
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.bgDarkLighter,
-        title: const Text('Select Language'),
+        title: const Text('Select Input Language'),
         content: SizedBox(
           width: double.maxFinite,
           child: ListView.builder(
@@ -346,12 +333,55 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 title: Text(
                   lang['name']!,
                   style: TextStyle(
-                    color: isSelected ? AppTheme.orangeMain : Colors.white,
+                    color: isSelected ? AppTheme.orangeMain : AppTheme.textDark,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
                 onTap: () {
                   settings.language = code;
+                  Navigator.pop(context);
+                },
+                trailing: isSelected
+                    ? const Icon(Icons.check, color: AppTheme.orangeMain)
+                    : null,
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showOutputLanguageDialog() async {
+    final settings = ref.read(settingsServiceProvider);
+    final languages = SettingsService.availableLanguages;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.bgDarkLighter,
+        title: const Text('Select Output Language'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: languages.length,
+            itemBuilder: (context, index) {
+              final code = languages.keys.elementAt(index);
+              final lang = languages[code]!;
+              final isSelected = settings.outputLanguage == code;
+
+              return ListTile(
+                leading: Text(lang['flag']!, style: const TextStyle(fontSize: 20)),
+                title: Text(
+                  lang['name']!,
+                  style: TextStyle(
+                    color: isSelected ? AppTheme.orangeMain : AppTheme.textDark,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+                onTap: () {
+                  settings.outputLanguage = code;
                   Navigator.pop(context);
                 },
                 trailing: isSelected
@@ -400,6 +430,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         [
                           _buildWhisperModelCard(context, settings),
                           _buildLanguageCard(context, settings),
+                          _buildOutputLanguageCard(context, settings),
                         ],
                       ),
                       const SizedBox(height: 24),
@@ -772,21 +803,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Widget _buildLanguageCard(BuildContext context, SettingsService settings) {
-    final languages = {
-      'en': {'name': 'English (US)', 'flag': '🇺🇸'},
-      'es': {'name': 'Spanish', 'flag': '🇪🇸'},
-      'fr': {'name': 'French', 'flag': '🇫🇷'},
-      'de': {'name': 'German', 'flag': '🇩🇪'},
-      'it': {'name': 'Italian', 'flag': '🇮🇹'},
-      'pt': {'name': 'Portuguese', 'flag': '🇵🇹'},
-      'nl': {'name': 'Dutch', 'flag': '🇳🇱'},
-      'ru': {'name': 'Russian', 'flag': '🇷🇺'},
-      'zh': {'name': 'Chinese', 'flag': '🇨🇳'},
-      'ja': {'name': 'Japanese', 'flag': '🇯🇵'},
-      'ko': {'name': 'Korean', 'flag': '🇰🇷'},
-      'auto': {'name': 'Auto Detect', 'flag': '🌍'},
-    };
-
+    final languages = SettingsService.availableLanguages;
     final currentLang = languages[settings.language] ?? languages['en']!;
 
     return GestureDetector(
@@ -821,7 +838,94 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  'Language',
+                  'Input Language',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.textDark,
+                        fontWeight: FontWeight.w500,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.02),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.black.withOpacity(0.05),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        currentLang['flag']!,
+                        style: const TextStyle(fontSize: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        currentLang['name']!,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppTheme.textDark,
+                            ),
+                      ),
+                    ],
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppTheme.textGray.withOpacity(0.5),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOutputLanguageCard(BuildContext context, SettingsService settings) {
+    final languages = SettingsService.availableLanguages;
+    final currentLang = languages[settings.outputLanguage] ?? languages['en']!;
+
+    return GestureDetector(
+      onTap: _showOutputLanguageDialog,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Colors.black.withOpacity(0.05),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.indigo.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.g_translate_rounded,
+                    color: Colors.indigo,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Output Language (Translation)',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppTheme.textDark,
                         fontWeight: FontWeight.w500,

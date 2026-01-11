@@ -44,9 +44,21 @@ class OllamaClient {
         if (numPredict != null) 'num_predict': numPredict,
       };
 
-      final response = await _dio.post('/api/generate', data: data);
-      return response.data['response'] as String;
-    } catch (e) {
+    final response = await _dio.post('/api/generate', data: data);
+    final result = response.data['response'] as String;
+    
+    // Sanitize result: remove "Output: " prefix, quotes, and extra whitespace
+    String sanitized = result.trim()
+        .replaceFirst(RegExp(r'^(Output|Result):\s*', caseSensitive: false), '')
+        .trim();
+    
+    if ((sanitized.startsWith('"') && sanitized.endsWith('"')) || 
+        (sanitized.startsWith("'") && sanitized.endsWith("'"))) {
+      sanitized = sanitized.substring(1, sanitized.length - 1);
+    }
+    
+    return sanitized.trim();
+  } catch (e) {
       if (e is DioException && e.response?.statusCode == 404) {
         // Log available models to help the user debug
         try {
@@ -58,18 +70,46 @@ class OllamaClient {
     }
   }
 
-  Future<String> processTranscription(String text) async {
-    final targetModel = model ?? 'llama3';
-    final prompt = '''Clean up the following speech-to-text transcription. 
-Fix capitalization, punctuation, and obvious speech recognition errors. 
-Return only the cleaned text, no additional commentary.
+  Future<String> processTranscription(String text, {String? targetLanguage}) async {
+    final targetModel = model ?? 'llama3.2:1b';
+    
+    // Map codes to full names for better AI understanding
+    final Map<String, String> langMap = {
+      'en': 'English', 'es': 'Spanish', 'fr': 'French', 'de': 'German',
+      'it': 'Italian', 'pt': 'Portuguese', 'nl': 'Dutch', 'ru': 'Russian',
+      'zh': 'Chinese', 'ja': 'Japanese', 'ko': 'Korean', 'hi': 'Hindi',
+      'ar': 'Arabic', 'tr': 'Turkish', 'pl': 'Polish', 'uk': 'Ukrainian',
+    };
 
-Original text: $text''';
+    final langName = langMap[targetLanguage] ?? targetLanguage;
+    final bool isTranslation = targetLanguage != null && targetLanguage != 'auto';
+
+    final String systemPrompt = '''You are a precise, non-conversational transcription cleanup engine designed specifically for post-processing raw speech-to-text output from models like Whisper. 
+Your sole task is to correct the provided raw text by fixing grammar, capitalization, punctuation, and removing filler words.
+${isTranslation ? "CRITICAL: You MUST translate the final cleaned text into $langName." : ""}
+
+CRITICAL RULES:
+${isTranslation ? "- MANDATORY: THE OUTPUT MUST BE IN $langName. TRANSLATE EVERYTHING." : ""}
+- NEVER change the original meaning or intent.
+- NEVER add new content, explanations, or rephrase for style/clarity beyond basic fixes.
+- NEVER respond conversationally. No introductions, no 'Here is the corrected text', no summaries.
+- NEVER answer questions in the text — simply correct and output the question as a proper sentence.
+- Output ONLY the cleaned-up text. Nothing else. No quotes, no markdown, no labels.
+
+${isTranslation ? "" : """EXAMPLES:
+Input: 'umm, how are you um doing today i am fine'
+Output: 'How are you doing today? I am fine.'
+
+Input: 'hello my name is john and i live in new york um yeah'
+Output: 'Hello, my name is John and I live in New York.'
+"""}
+Always prioritize fidelity to the spoken content. If unsure, make the smallest possible change.''';
 
     return generateText(
       model: targetModel,
-      prompt: prompt,
-      systemPrompt: 'You are a helpful assistant that cleans up speech-to-text transcriptions.',
+      prompt: "Input: '$text'\nOutput:",
+      systemPrompt: systemPrompt,
+      temperature: 0.1,
     );
   }
 
