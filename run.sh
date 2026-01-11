@@ -66,6 +66,12 @@ if command -v ydotoold &> /dev/null; then
     echo "Using YDOTOOL_SOCKET=$YDOTOOL_SOCKET"
 fi
 
+# Force GDK to use X11 backend even on Wayland sessions.
+# This is required for manual window positioning (the interim overlay) 
+# and transparency to work consistently across different terminals.
+# Wayland's security model prevents applications from positioning themselves.
+export GDK_BACKEND=x11
+
 # Check for --fast or -f flag to skip building
 FAST_MODE=false
 for arg in "$@"; do

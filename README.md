@@ -106,9 +106,15 @@ flutter pub get
 # Build native components
 # (Managed automatically by Flutter during build)
 
-# Run
-flutter run -d linux
+# Run (Recommended)
+./run.sh
+
+# Run without re-building (Fast Mode)
+./run.sh --fast
 ```
+
+**Note for Wayland Users:** 
+On Wayland sessions (default on Fedora/KDE), native window managers prevent applications from positioning themselves. To ensure the **Interim Overlay Window** appears correctly at the bottom of your screen, always use the provided `./run.sh` script. It forces the `GDK_BACKEND=x11` compatibility layer, allowing the app to control its own window placement.
 
 ---
 
