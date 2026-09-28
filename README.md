@@ -27,11 +27,11 @@
 
 <br>
 
-<a href="images/demo.mp4">
+<a href="https://cdn.jsdelivr.net/gh/AxDSan/localvoicesync@master/images/demo.mp4">
   <img src="images/demo.webp" alt="LocalVoiceSync demo: three messy dictations turn into clean text in a team chat, a terminal, and an email" width="100%">
 </a>
 
-<sub>🔊 <a href="images/demo.mp4"><b>Watch the full film with sound</b></a> · 42 s · 1080p</sub>
+<sub>🔊 <a href="https://cdn.jsdelivr.net/gh/AxDSan/localvoicesync@master/images/demo.mp4"><b>Watch the full film with sound</b></a> · 42 s · 1080p</sub>
 
 </div>
 
