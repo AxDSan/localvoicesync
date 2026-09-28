@@ -64,6 +64,15 @@ set_target_properties(${BINARY_NAME}
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# Add custom native libraries
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../native/hotkey" "${CMAKE_BINARY_DIR}/native/hotkey")
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../native/vad" "${CMAKE_BINARY_DIR}/native/vad")
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../native/whisper" "${CMAKE_BINARY_DIR}/native/whisper")
+
+list(APPEND PLUGIN_BUNDLED_LIBRARIES $<TARGET_FILE:hotkey>)
+list(APPEND PLUGIN_BUNDLED_LIBRARIES $<TARGET_FILE:vad>)
+list(APPEND PLUGIN_BUNDLED_LIBRARIES $<TARGET_FILE:whisper>)
+
 
 # === Installation ===
 # By default, "installing" just makes a relocatable bundle in the build
@@ -97,10 +106,14 @@ foreach(bundled_library ${PLUGIN_BUNDLED_LIBRARIES})
 endforeach(bundled_library)
 
 # Copy the native assets provided by the build.dart from all packages.
+# Flutter only creates this directory when some package ships code assets,
+# so check for it at install time instead of failing the build.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/linux/")
-install(DIRECTORY "${NATIVE_ASSETS_DIR}"
-   DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
-   COMPONENT Runtime)
+install(CODE "
+  if(EXISTS \"${NATIVE_ASSETS_DIR}\")
+    file(INSTALL \"${NATIVE_ASSETS_DIR}\" DESTINATION \"${INSTALL_BUNDLE_LIB_DIR}\")
+  endif()
+  " COMPONENT Runtime)
 
 # Fully re-copy the assets directory on each build to avoid having stale files
 # from a previous install.
