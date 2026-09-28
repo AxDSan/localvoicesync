@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:desktop_multi_window/desktop_multi_window.dart';
@@ -10,11 +12,11 @@ import 'ui/widgets/interim_results_window.dart';
 
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // =========================================================================
   // MULTI-WINDOW OVERLAY PROCESS
   // =========================================================================
-  // When launched as a secondary process (overlay window), we skip all 
+  // When launched as a secondary process (overlay window), we skip all
   // window_manager calls because the plugin isn't registered in this process.
   // The native C++ code (my_application.cc) handles all window configuration
   // including: frameless, transparency, click-through, positioning.
@@ -24,10 +26,12 @@ void main(List<String> args) async {
     final argument = args[2].isEmpty
         ? const <String, dynamic>{}
         : Map<String, dynamic>.from(jsonDecode(args[2]) as Map);
-    
+
     // DO NOT use window_manager here - it's not registered in secondary process
     // The native C++ ghost window setup handles all window configuration
-    debugPrint('DEBUG: [main] Starting overlay process (window ID: $windowIdString)');
+    debugPrint(
+      'DEBUG: [main] Starting overlay process (window ID: $windowIdString)',
+    );
 
     runApp(
       ProviderScope(
@@ -41,10 +45,7 @@ void main(List<String> args) async {
               brightness: Brightness.dark,
             ),
           ),
-          home: InterimOverlayUI(
-            windowId: windowIdString,
-            args: argument,
-          ),
+          home: InterimOverlayUI(windowId: windowIdString, args: argument),
         ),
       ),
     );
@@ -55,19 +56,21 @@ void main(List<String> args) async {
   // MAIN APPLICATION PROCESS
   // =========================================================================
   await windowManager.ensureInitialized();
-  
+
   final container = ProviderContainer();
-  
+
   // Initialize settings
   final settings = container.read(settingsServiceProvider);
   await settings.initialize();
-  
+
   // Initialize VoiceSyncManager
   print('DEBUG: [main] Starting VoiceSyncManager initialization...');
   final manager = container.read(voiceSyncManagerProvider);
   try {
     await manager.initialize();
-    print('DEBUG: [main] VoiceSyncManager initialization completed successfully.');
+    print(
+      'DEBUG: [main] VoiceSyncManager initialization completed successfully.',
+    );
   } catch (e, stack) {
     print('DEBUG: [main] VoiceSyncManager initialization FAILED: $e');
     print('DEBUG: Stack trace: $stack');
@@ -76,12 +79,30 @@ void main(List<String> args) async {
   // Initialize Overlay Controller
   container.read(overlayControllerProvider);
 
+  final overlayController = container.read(overlayControllerProvider);
+
+  // Run the app
   runApp(
     UncontrolledProviderScope(
       container: container,
       child: const LocalVoiceSyncApp(),
     ),
   );
+
+  // Handle process exit to clean up windows
+  Future<void> cleanupAndExit(ProcessSignal signal) async {
+    print('DEBUG: [main] Received exit signal, cleaning up...');
+    try {
+      await overlayController.dispose();
+    } catch (e) {
+      print('DEBUG: [main] Cleanup error: $e');
+    }
+    exit(0);
+  }
+
+  // Listen for SIGINT (Ctrl+C) and SIGTERM
+  ProcessSignal.sigint.watch().listen(cleanupAndExit);
+  ProcessSignal.sigterm.watch().listen(cleanupAndExit);
 }
 
 class LocalVoiceSyncApp extends StatelessWidget {

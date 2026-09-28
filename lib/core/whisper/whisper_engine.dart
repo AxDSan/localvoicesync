@@ -25,20 +25,25 @@ class WhisperEngine {
     String? libraryPath,
   }) async {
     print('DEBUG: WhisperEngine.initialize(modelPath: $modelPath)');
-    
-    final resolvedLibraryPath = libraryPath ?? (Platform.isLinux ? 'libwhisper.so' : 'whisper.dll');
+
+    final resolvedLibraryPath =
+        libraryPath ?? (Platform.isLinux ? 'libwhisper.so' : 'whisper.dll');
     final receivePort = ReceivePort();
-    
-    await Isolate.spawn(_whisperIsolate, [receivePort.sendPort, resolvedLibraryPath, modelPath]);
-    
+
+    await Isolate.spawn(_whisperIsolate, [
+      receivePort.sendPort,
+      resolvedLibraryPath,
+      modelPath,
+    ]);
+
     final events = receivePort.asBroadcastStream();
     final commandPort = await events.first as SendPort;
-    
+
     // Request metadata
     final metadataPort = ReceivePort();
     commandPort.send(['get_metadata', metadataPort.sendPort]);
     final metadata = await metadataPort.first as Map<String, dynamic>;
-    
+
     return WhisperEngine._(commandPort, metadata);
   }
 
@@ -53,17 +58,21 @@ class WhisperEngine {
       throw WhisperException('Whisper engine not initialized');
     }
 
-    print('DEBUG: WhisperEngine.transcribe called with ${audioSamples.length} samples');
-    
+    print(
+      'DEBUG: WhisperEngine.transcribe called with ${audioSamples.length} samples',
+    );
+
     final responsePort = ReceivePort();
-    _commandPort.send(_TranscribeRequest(
-      responsePort: responsePort.sendPort,
-      audioSamples: audioSamples,
-      strategy: strategy,
-      language: language,
-      nThreads: nThreads,
-      translate: translate,
-    ));
+    _commandPort.send(
+      _TranscribeRequest(
+        responsePort: responsePort.sendPort,
+        audioSamples: audioSamples,
+        strategy: strategy,
+        language: language,
+        nThreads: nThreads,
+        translate: translate,
+      ),
+    );
 
     final result = await responsePort.first;
     if (result is String) {
@@ -86,13 +95,15 @@ class WhisperEngine {
     print('DEBUG: [Isolate] Opening library at $libraryPath');
     final lib = DynamicLibrary.open(libraryPath);
     final bindings = WhisperBindings(lib);
-    
-    print('DEBUG: [Isolate] Initializing whisper context with model: $modelPath');
+
+    print(
+      'DEBUG: [Isolate] Initializing whisper context with model: $modelPath',
+    );
     final cparams = bindings.contextDefaultParams();
     // Enable GPU support
     cparams.use_gpu = true;
     print('DEBUG: [Isolate] GPU support enabled: ${cparams.use_gpu}');
-    
+
     final modelPtr = modelPath.toNativeUtf8();
     final context = bindings.initFromFileWithParams(modelPtr.cast(), cparams);
     calloc.free(modelPtr);
@@ -140,7 +151,11 @@ class WhisperEngine {
           calloc.free(samplesPtr);
 
           if (result != 0) {
-            msg.responsePort.send(WhisperException('Whisper transcription failed with code $result'));
+            msg.responsePort.send(
+              WhisperException(
+                'Whisper transcription failed with code $result',
+              ),
+            );
             continue;
           }
 
@@ -155,7 +170,9 @@ class WhisperEngine {
           }
 
           final finalResult = buffer.toString().trim();
-          print('DEBUG: [Isolate] Transcription finished, result length: ${finalResult.length}');
+          print(
+            'DEBUG: [Isolate] Transcription finished, result length: ${finalResult.length}',
+          );
           msg.responsePort.send(finalResult);
         } catch (e) {
           msg.responsePort.send(WhisperException('Transcription error: $e'));
