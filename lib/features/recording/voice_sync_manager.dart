@@ -139,6 +139,16 @@ class VoiceSyncManager {
     });
 
     _audio.samplesStream.listen(_handleAudioSamples);
+
+    _preloadOllama();
+  }
+
+  /// Fire-and-forget: get the cleanup model resident before it's needed so
+  /// `stopRecording` doesn't sit in `processing` through a cold load.
+  void _preloadOllama() {
+    _ollama.preload().catchError((Object e) {
+      print('DEBUG: Ollama preload failed: $e');
+    });
   }
 
   int _sampleDebugCounter = 0;
@@ -297,6 +307,7 @@ class VoiceSyncManager {
       _state = RecordingState.recording;
       _stateController.add(_state);
       onStateChange?.call(_state);  // Immediate callback for UI
+      _preloadOllama();
 
       await _audio.start();
       print('DEBUG: Audio capture started successfully');
@@ -417,10 +428,14 @@ class VoiceSyncManager {
     _hotkey.setPttKey(_settings.pttKey);
     
     // Refresh Ollama client with new settings
-    _ollama = OllamaClient(
-      baseUrl: _settings.ollamaEndpoint,
-      model: _settings.ollamaModel,
-    );
+    if (_ollama.baseUrl != _settings.ollamaEndpoint ||
+        _ollama.model != _settings.ollamaModel) {
+      _ollama = OllamaClient(
+        baseUrl: _settings.ollamaEndpoint,
+        model: _settings.ollamaModel,
+      );
+      _preloadOllama();
+    }
     
     if (_vad != null) {
       _vad!.setThreshold(_settings.vadThreshold);

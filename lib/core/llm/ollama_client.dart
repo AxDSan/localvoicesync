@@ -16,6 +16,24 @@ class OllamaClient {
           receiveTimeout: const Duration(seconds: 60),
         ));
 
+  /// How long Ollama keeps the model resident after the last request.
+  /// Ollama's default (5m) unloads it between dictations, and a cold load
+  /// takes tens of seconds when Whisper shares the GPU.
+  static const _keepAlive = '30m';
+
+  String get _targetModel => model ?? 'llama3.2:1b';
+
+  /// Loads the model into memory without generating anything. Returns as soon
+  /// as the model is resident; near-instant (and refreshes keep-alive) if it
+  /// already is.
+  Future<void> preload() async {
+    await _dio.post(
+      '/api/generate',
+      data: {'model': _targetModel, 'keep_alive': _keepAlive},
+      options: Options(receiveTimeout: const Duration(minutes: 5)),
+    );
+  }
+
   Future<List<String>> getModels() async {
     try {
       final response = await _dio.get('/api/tags');
@@ -42,6 +60,7 @@ class OllamaClient {
         'temperature': temperature,
         if (systemPrompt != null) 'system': systemPrompt,
         if (numPredict != null) 'num_predict': numPredict,
+        'keep_alive': _keepAlive,
       };
 
     final response = await _dio.post('/api/generate', data: data);
@@ -71,7 +90,7 @@ class OllamaClient {
   }
 
   Future<String> processTranscription(String text, {String? targetLanguage}) async {
-    final targetModel = model ?? 'llama3.2:1b';
+    final targetModel = _targetModel;
     
     // Map codes to full names for better AI understanding
     final Map<String, String> langMap = {
