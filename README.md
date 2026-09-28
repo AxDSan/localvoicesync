@@ -96,7 +96,14 @@ sudo dnf install wtype ydotool xinput
 sudo dnf install xdotool
 ```
 
-**Note on `ydotool`:** This tool requires a background daemon. You can start it automatically by running the included `./run.sh` script, or manually via `sudo ydotoold`.
+**Note on `ydotool`:** This tool requires a background daemon. `./run.sh` starts it for you as your own user (no `sudo`); it only needs write access to `/dev/uinput`, which the active desktop session normally gets through a udev `uaccess` rule.
+
+### 🩺 Health Check
+`./run.sh` first runs `./doctor.sh`, which checks the build toolchain, the Whisper and VAD models, the microphone, Ollama and the configured cleanup model, the text-injection tools (and starts `ydotoold` if needed), and free VRAM. If any check fails, the app is not started and each failure prints a fix. Run it on its own at any time:
+```bash
+./doctor.sh                    # full check
+./doctor.sh --no-build-checks  # skip toolchain checks (what ./run.sh --fast uses)
+```
 
 ### 🔨 Build Process
 ```bash
