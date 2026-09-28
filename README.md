@@ -5,192 +5,214 @@
 
 <div align="center">
 
-# LocalVoiceSync
-### Privacy-First Speech-to-Text for Linux
+# 🎙️ LocalVoiceSync
 
-[![Flutter](https://img.shields.io/badge/Flutter-3.10+-02569B.svg)](https://flutter.dev/)
+### Privacy-first speech-to-text for Linux
 
 **Speak naturally. We'll handle the rest.**
 
-[Features](#key-features) •
-[Installation](#installation) •
-[Architecture](#architecture) •
-[Contributing](#contributing)
+[![Platform](https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black)](#-installation)
+[![Wayland & X11](https://img.shields.io/badge/Wayland%20%26%20X11-supported-1f6feb)](#-installation)
+[![Flutter](https://img.shields.io/badge/Flutter-Dart%203.10%2B-02569B?logo=flutter&logoColor=white)](https://flutter.dev/)
+[![whisper.cpp](https://img.shields.io/badge/whisper.cpp-Vulkan%20GPU-7c3aed)](https://github.com/ggml-org/whisper.cpp)
+[![Ollama](https://img.shields.io/badge/Ollama-local%20LLM-000000?logo=ollama&logoColor=white)](https://ollama.com/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-22c55e)](LICENSE)
+
+[Demo](#-see-it-in-action) •
+[Features](#-features) •
+[Installation](#-installation) •
+[Usage](#%EF%B8%8F-usage) •
+[Architecture](#%EF%B8%8F-architecture) •
+[Contributing](#-contributing)
+
+<br>
+
+<a href="images/demo.mp4">
+  <img src="images/demo.webp" alt="LocalVoiceSync demo: three messy dictations turn into clean text in a team chat, a terminal, and an email" width="100%">
+</a>
+
+<sub>🔊 <a href="images/demo.mp4"><b>Watch the full film with sound</b></a> · 42 s · 1080p</sub>
 
 </div>
 
 ---
 
-![LocalVoiceSync](/images/screenshot.png)
-
 ## 🚀 Overview
 
-**LocalVoiceSync** is a privacy-first, toggle-to-record speech-to-text application designed for Linux desktops. Unlike cloud-based assistants or standard dictation tools, LocalVoiceSync processes everything locally on your device and uses an intelligent LLM (Large Language Model) pipeline to clean up your speech instantly.
+**LocalVoiceSync** turns your voice into clean, ready-to-send text in whatever app has focus, and it does all of it on your own machine.
 
-Say goodbye to "ums", "ahs", stuttering, and grammatical errors. Just press a global hotkey, speak your thoughts freely, and watch polished, professional text appear in your active window.
+You talk the way people actually talk: *"um"*, *"like"*, false starts and all. [Whisper](https://github.com/ggml-org/whisper.cpp) transcribes it on your GPU, a local LLM running in [Ollama](https://ollama.com/) strips the filler and fixes the grammar, and the result is typed straight into your chat, terminal, editor or email.
 
-### Why LocalVoiceSync?
+### 🎬 See it in action
 
-- **🔒 100% Privacy**: Your voice never leaves your machine. No cloud APIs, no data mining.
-- **🧠 Intelligent Cleanup**: Removes filler words, fixes stuttering, and corrects grammar automatically.
-- **⚡ Zero Latency Feel**: Optimized for local GPU acceleration.
-- **🐧 Linux First**: Native integration with Wayland and X11.
+The film above is one working day, three dictations. The transcripts below are the pipeline's real output for those takes:
 
----
+| 🗣️ You say (raw Whisper) | ✨ You get (after local LLM cleanup) | 📍 Typed into |
+| --- | --- | --- |
+| ~~Um,~~ so I was thinking, ~~like,~~ we should, ~~uh,~~ probably ship ~~the,~~ the update on Friday? Yeah. | So I was thinking we should probably ship the update on Friday? Yes. | Team chat |
+| Fix the login bug when the token expires. | Fix the login bug when the token expires. | `git commit -m` |
+| Hey, Sarah. Just wanted to say thanks for, ~~like,~~ covering for me yesterday. You're the best. | Hey, Sarah. Just wanted to say thanks for covering for me yesterday. You're the best. | Email |
 
-## ✨ Key Features
+Already-clean speech passes through untouched; only the filler goes.
 
-- **Multiple Recording Modes**:
-  - **Manual Toggle**: Press once to start, press again to stop (Global Hotkey).
-  - **Live Mode (VAD)**: Voice Activation Detection automatically starts/stops recording based on speech.
-- **Global Hotkey**: Trigger dictation from *any* application (default: `Ctrl+Alt+V`).
-- **Smart Injection**: Automatically types or pastes cleaned text into your foreground app (VS Code, Obsidian, Browser, etc.).
-- **Dual Engine**:
-  - **Whisper**: Industry-leading speech recognition accuracy.
-  - **Ollama**: Context-aware text refinement and grammar correction using local LLMs.
-- **History Management**: Keep track of your raw vs. cleaned transcriptions.
-- **Native Linux Performance**: Built with **Flutter** for a modern UI and C++ for high-performance audio processing.
+### 💡 Why LocalVoiceSync?
+
+- **🔒 Nothing leaves your machine.** No cloud APIs, no accounts, no telemetry. Audio, transcripts and cleanup all stay local.
+- **🧠 Intelligent cleanup.** Filler words, stutters and repeated words are removed and grammar is fixed, while your meaning stays yours.
+- **⚡ Fast.** whisper.cpp runs on your GPU through Vulkan, and the Ollama model is preloaded so cleanup doesn't stall after you stop talking.
+- **🐧 Linux first.** Works on Wayland and X11, and types into any focused app.
 
 ---
 
-## 🛠️ Architecture
+## ✨ Features
 
-LocalVoiceSync uses a sophisticated local pipeline to transform audio into polished text.
+- **🎛️ Three recording modes**
+  - **Manual**: click the record button to start, click again to stop.
+  - **Live**: [Silero VAD](https://github.com/snakers4/silero-vad) listens continuously and records whenever you speak.
+  - **Push-to-talk (PTT)**: hold a key while you talk, release to send. Defaults to `F12` and can be rebound in Settings. Pressing it in any mode switches the app to PTT automatically.
+- **💬 Live interim overlay**: a floating pill shows what Whisper is hearing while you speak.
+- **⌨️ Types into any app**: `ydotool` (with `wtype` and `dotool` as fallbacks) on Wayland, `xdotool` on X11, or clipboard + paste if you prefer.
+- **🗂️ History**: every dictation keeps its raw and cleaned version side by side.
+- **🩺 Built-in health check**: `./doctor.sh` checks models, microphone, Ollama, injection tools and free VRAM before the app starts, and prints a fix for anything that's off.
+- **🏎️ Native where it counts**: whisper.cpp, an ONNX Runtime VAD and X11 key polling in C/C++, wired into a Flutter UI through Dart FFI.
 
-```mermaid
-graph TD
-    User([User]) -->|Toggle ON| Mic[Audio Capture]
-    Mic -->|Raw Audio Buffer| Buffer[Ring Buffer]
-    User -->|Toggle OFF| Processor[Processing Pipeline]
-    
-    subgraph "Local Processing Core"
-        Processor -->|Resample 16kHz| Whisper[Whisper Engine]
-        Whisper -->|Raw Text| LLM[LLM Cleanup Agent]
-        LLM -->|Cleaned Text| Injector[Input Injector]
-    end
-    
-    Injector -->|Simulate Keystrokes| App[Active Application]
-    
-    note[Models stored locally<br/>assets/models] -.-> Whisper
-    note -.-> LLM
-```
+<div align="center">
+  <img src="images/screenshot.png" alt="LocalVoiceSync Record page" width="80%">
+</div>
 
 ---
 
-## 📦 Installation & Building
+## 📦 Installation
 
-LocalVoiceSync is a **Flutter application** with native C++ components for Whisper and VAD.
+LocalVoiceSync is a **Flutter** desktop app with native C/C++ components for Whisper, VAD and hotkeys.
 
-### 🛠️ Dependencies (Fedora/RHEL)
+### 1. System dependencies (Fedora/RHEL)
+
 ```bash
-# Flutter Requirements
+# Flutter Linux toolchain
 sudo dnf install clang cmake ninja-build pkg-config gtk3-devel
 
-# Hardware Acceleration
+# GPU acceleration for Whisper
 sudo dnf install vulkan-loader-devel mesa-vulkan-devel
 
-# Text Injection Tools (Required for Speech-to-Text)
-# For Wayland (Default on Fedora):
-sudo dnf install wtype ydotool xinput
-# For X11:
-sudo dnf install xdotool
+# Text injection
+sudo dnf install ydotool xinput wtype   # Wayland (default on Fedora)
+sudo dnf install xdotool                # X11
 ```
 
-**Note on `ydotool`:** This tool requires a background daemon. `./run.sh` starts it for you as your own user (no `sudo`); it only needs write access to `/dev/uinput`, which the active desktop session normally gets through a udev `uaccess` rule.
+> [!NOTE]
+> `ydotool` needs its `ydotoold` daemon. `./run.sh` starts it for you as your own user (no `sudo`); it only needs write access to `/dev/uinput`, which the active desktop session normally gets through a udev `uaccess` rule.
 
-### 🩺 Health Check
-`./run.sh` first runs `./doctor.sh`, which checks the build toolchain, the Whisper and VAD models, the microphone, Ollama and the configured cleanup model, the text-injection tools (and starts `ydotoold` if needed), and free VRAM. If any check fails, the app is not started and each failure prints a fix. Run it on its own at any time:
+### 2. Models
+
+Put the Whisper and VAD models in `assets/models/`. They're bundled with the build and copied to `~/.local/share/localvoicesync/models/` on first run.
+
+```bash
+curl -L -o assets/models/ggml-large-v3-turbo.bin \
+  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin
+curl -L -o assets/models/silero_vad.onnx \
+  https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx
+```
+
+Then install [Ollama](https://ollama.com/) and pull the cleanup model:
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull llama3.2:1b
+```
+
+### 3. Build & run
+
+```bash
+flutter pub get
+./run.sh          # build and run (recommended)
+./run.sh --fast   # run the last debug build without rebuilding
+```
+
+### 🩺 Health check
+
+`./run.sh` runs `./doctor.sh` first. It checks the build toolchain, the Whisper and VAD models, the microphone, Ollama and the configured cleanup model, the text-injection tools (starting `ydotoold` if needed), and free VRAM. If anything fails, the app doesn't start and each failure prints its fix. Run it on its own any time:
+
 ```bash
 ./doctor.sh                    # full check
 ./doctor.sh --no-build-checks  # skip toolchain checks (what ./run.sh --fast uses)
 ```
 
-### 🔨 Build Process
-```bash
-# Install dependencies
-flutter pub get
+> [!TIP]
+> **Wayland users:** Wayland doesn't let apps position their own windows. Always start through `./run.sh`; it sets `GDK_BACKEND=x11` so the interim overlay can place itself at the bottom of your screen.
 
-# Build native components
-# (Managed automatically by Flutter during build)
+---
 
-# Run (Recommended)
-./run.sh
+## 🖥️ Usage
 
-# Run without re-building (Fast Mode)
-./run.sh --fast
+1. **Launch** with `./run.sh`.
+2. **Check Settings**: make sure Ollama is reachable and your models are detected.
+3. **Pick a mode**: Manual, Live or PTT.
+4. **Focus any text field** in any app and talk:
+   - **Manual**: click the record button, speak, click again.
+   - **Live**: just start speaking.
+   - **PTT**: hold your push-to-talk key (default `F12`), speak, let go.
+5. **Watch** the cleaned text appear where your cursor is.
+
+---
+
+## ⚙️ Configuration
+
+Everything below lives in **Settings**.
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| Whisper model | `ggml-large-v3-turbo.bin` | Any ggml `.bin` in `~/.local/share/localvoicesync/models/`. |
+| Ollama endpoint | `http://localhost:11434` | |
+| Cleanup model | `llama3.2:1b` | Small and fast; `qwen2.5:1.5b` is a good alternative. The demo film used `qwen2.5:7b-instruct`. |
+| Push-to-talk key | `F12` | Click the card and press the key you want. |
+| VAD threshold | `0.5` | How readily speech triggers recording in Live mode. |
+| Injection method | Direct input | Switch to Clipboard to paste instead of type. |
+
+---
+
+## 🛠️ Architecture
+
+```mermaid
+flowchart LR
+    Mic([🎙️ Microphone]) --> Capture[Audio capture]
+
+    subgraph Machine["🔒 Your machine: nothing leaves it"]
+        Capture -->|Live mode| VAD[Silero VAD<br/>ONNX Runtime]
+        Capture -->|Manual / PTT| Whisper
+        VAD -->|speech segments| Whisper[whisper.cpp<br/>Vulkan GPU]
+        Whisper -->|raw text| LLM[Ollama<br/>local LLM cleanup]
+        LLM -->|clean text| Inject[ydotool · wtype · dotool<br/>xdotool on X11]
+    end
+
+    Whisper -. interim text .-> Overlay[[Interim overlay]]
+    Inject --> App([Focused app])
 ```
 
-**Note for Wayland Users:** 
-On Wayland sessions (default on Fedora/KDE), native window managers prevent applications from positioning themselves. To ensure the **Interim Overlay Window** appears correctly at the bottom of your screen, always use the provided `./run.sh` script. It forces the `GDK_BACKEND=x11` compatibility layer, allowing the app to control its own window placement.
-
----
-
-## 🧠 Development Practices
-
-- **Framework**: Flutter (Dart).
-- **Native Interop**: Dart FFI for high-performance C++ bindings.
-- **Hardware Acceleration**: GPU acceleration enabled for Whisper inference.
-- **State Management**: Riverpod for a clean and reactive architecture.
-
----
-
-## ⚙️ Configuration & Models
-
-LocalVoiceSync relies on local AI models and customizable settings.
-
-### 1. Recording & Hotkeys
-- **Global Hotkey**: `Ctrl+Alt+V` toggles recording.
-- **VAD Sensitivity**: Adjust how easily speech triggers recording in Live mode.
-
-### 2. Whisper Model (Speech-to-Text)
-We recommend `large-v3-turbo` for the best balance of speed and accuracy.
-- **Location**: `assets/models/`
-- **Supported Formats**: `.bin` (ggml)
-
-### 3. LLM Model (Text Cleanup)
-Powered by **Ollama**.
-- **Recommended**: `llama3.2:1b` or `qwen2.5:1.5b`.
-- **Setup**:
-  ```bash
-  # Install Ollama
-  curl -fsSL https://ollama.com/install.sh | sh
-  
-  # Pull the cleanup model
-  ollama pull llama3.2:1b
-  ```
-
----
-
-## 🖥️ Usage Guide
-
-1. **Launch the App**: Start LocalVoiceSync.
-2. **Setup**: Go to Settings, ensure Ollama is running and models are detected.
-3. **Select Mode**: Choose between **Manual** or **Live (VAD)**.
-4. **Record**:
-   - Focus any text field in any app.
-   - Press `Ctrl+Alt+V` or just start speaking.
-5. **Watch**: The app will process your audio and type the corrected text into your window.
+- **UI**: Flutter (Dart) with Riverpod for state.
+- **Native interop**: Dart FFI bindings to whisper.cpp, the VAD wrapper and the X11 hotkey helper, built with CMake.
+- **Cleanup**: Ollama over its local HTTP API, with the model kept warm between dictations.
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions!
+Contributions are welcome!
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+1. Fork the project
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push the branch (`git push origin feature/amazing-feature`)
+5. Open a pull request
 
 ---
 
 ## 📄 License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the MIT License. See [`LICENSE`](LICENSE) for details.
 
 ---
 
 <div align="center">
-  <p>Made with ❤️ for the Linux Community</p>
+  <sub>Made with ❤️ for the Linux community</sub>
 </div>
